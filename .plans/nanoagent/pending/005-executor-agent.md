@@ -1,0 +1,72 @@
+# Task 005: Executor Agent with Tool Calling Tests
+
+**Iteration:** Foundation
+**Status:** Pending
+**Dependencies:** 002
+**Files:** nanoagent/core/executor.py, nanoagent/core/executor_test.py
+
+## Description
+Implement Executor as a Pydantic AI agent that executes tasks using tools. Follow TDD: write tests with mock tools first. Validates structured output (ExecutionResult) and tool calling patterns. Target ~80 LOC.
+
+## Working Result
+- Executor agent configured with Pydantic AI
+- Returns ExecutionResult with success/output
+- Supports tool registration via dependencies
+- Tests validate tool calling works correctly
+- Tests use mock tools (real tools come later)
+- All tests passing
+
+## Validation
+- [ ] executor_test.py has tests with mock tools
+- [ ] Tests validate ExecutionResult structure parsing
+- [ ] Tool calling mechanism works (agent can call registered tools)
+- [ ] Dependencies correctly passed to tools via RunContext
+- [ ] `uv run test nanoagent/core/executor_test.py` passes
+- [ ] `uv run check` passes
+
+## LLM Prompt
+<prompt>
+**Goal:** Prove that Pydantic AI agents can call tools via dependency injection and return structured ExecutionResult (validates Critical Risk #1)
+
+**Constraints:**
+- Must follow TDD: write tests before implementation
+- Target ~80 LOC for implementation
+- Must use mock tools in tests (real tools come in Milestone 2)
+- Must validate ExecutionResult structure parsing
+- Must demonstrate RunContext dependency injection works
+- Use anthropic:claude-sonnet-4-0 model
+
+**Implementation Guidance:**
+- Write tests first with simple mock tools (e.g., mock_search)
+- Create ExecutorDeps BaseModel with task and available_tools dict
+- Create Pydantic AI Agent with result_type=ExecutionResult, deps_type=ExecutorDeps
+- Register mock tools using @executor.tool decorator in tests
+- Tools receive RunContext[ExecutorDeps] to access dependencies
+- System prompt should explain tool usage and success/failure reporting
+- Test: agent can call registered tools
+- Test: ExecutionResult structure is correctly parsed
+- Test: both success=True and success=False cases
+- Add ABOUTME comments
+
+**Tool Registration Pattern:**
+```python
+@executor.tool
+async def mock_tool(ctx: RunContext[ExecutorDeps], param: str) -> str:
+    return f"Result for: {param}"
+```
+
+**System Prompt Guidance:**
+- Explain when and how to use available tools
+- Emphasize thorough output explaining what was done
+- Request success=True if task completed, False if failed
+
+**Validation:**
+- Tests with mock tools pass
+- ExecutionResult parsing works (Critical Risk #1 validated)
+- Tool calling mechanism proven
+- Run `uv run check` - no errors
+</prompt>
+
+## Notes
+
+**planning:** This validates tool calling patterns and ExecutionResult parsing. Mock tools are sufficient for now - we're testing the agent framework, not tool implementations. Real tools added in Milestone 2.
