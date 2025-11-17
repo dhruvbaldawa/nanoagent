@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_essentials_context7__resolve-library-id",
+      "mcp__plugin_essentials_context7__get-library-docs",
+      "WebFetch(domain:docs.astral.sh)",
+      "WebFetch(domain:github.com)",
+      "Bash(pre-commit run:*)",
+      "Bash(uv tree:*)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:docs.pydantic.dev)",
+      "Bash(/dev/null)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
