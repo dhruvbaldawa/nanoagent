@@ -6,11 +6,12 @@ build-backend = "hatchling.build"
 name = "nanoagent"
 version = "0.1.0"
 description = "Lightweight multi-agent framework using Pydantic AI"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "pydantic==2.12.4",
     "pydantic-ai==1.18.0",
     "anthropic==0.73.0",
+    "nanoid==2.0.0",
 ]
 
 [dependency-groups]
@@ -20,25 +21,62 @@ dev = [
     "ruff>=0.4.0",
     "basedpyright>=1.13.0",
     "pre-commit>=3.0",
+    "pytest-cov>=7.0.0",
 ]
 
 [tool.ruff]
 line-length = 120
 lint.select = ["E", "F", "I", "B", "UP", "S", "RET", "N"]
 
+[tool.ruff.lint.per-file-ignores]
+"*_test.py" = ["S101"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 
 [tool.basedpyright]
+include = ["nanoagent"]
+exclude = ["**/__pycache__"]
+pythonVersion = "3.13"
 typeCheckingMode = "strict"
-pythonVersion = "3.14"
+
+# Configure basedpyright to use uv virtual environment
+venvPath = "."
+venv = ".venv"
+
+executionEnvironments = [
+  { root = "nanoagent", extraPaths = ["."], reportUnusedCallResult = "none" }
+]
 
 [tool.pytest.ini_options]
 testpaths = ["nanoagent"]
 python_files = ["*_test.py"]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*_test.py",
+    "test_*",
+    "*/tests.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
 
 [tool.uv]
 managed = true

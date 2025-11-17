@@ -9,7 +9,10 @@
       "Bash(uv tree:*)",
       "WebFetch(domain:pypi.org)",
       "WebFetch(domain:docs.pydantic.dev)",
-      "Bash(/dev/null)"
+      "Bash(/dev/null)",
+      "WebFetch(domain:docs.aral.sh)",
+      "Bash(mv:*)",
+      "mcp__plugin_essentials_sequential-thinking__sequentialthinking"
     ],
     "deny": [],
     "ask": []
