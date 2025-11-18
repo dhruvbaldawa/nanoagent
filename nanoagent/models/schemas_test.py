@@ -5,6 +5,7 @@
 # pyright: reportMissingImports = warning
 # pyright: reportUnusedCallResult = none
 
+import string
 
 import pytest
 from pydantic import ValidationError
@@ -18,6 +19,7 @@ from nanoagent.models.schemas import (
     Task,
     TaskPlanOutput,
     TaskStatus,
+    generate_task_id,
 )
 
 
@@ -220,8 +222,6 @@ class TestTaskIdGeneration:
 
     def test_generate_task_id_length(self):
         """Test that generate_task_id() always returns exactly 8 characters"""
-        from nanoagent.models.schemas import generate_task_id
-
         for _ in range(100):  # Test multiple generations
             task_id = generate_task_id()
             assert len(task_id) == 8
@@ -229,18 +229,12 @@ class TestTaskIdGeneration:
 
     def test_generate_task_id_uniqueness(self):
         """Test that generated task IDs are unique"""
-        from nanoagent.models.schemas import generate_task_id
-
         # Generate 100 IDs and verify they're all unique
         ids = [generate_task_id() for _ in range(100)]
         assert len(set(ids)) == len(ids)  # All IDs should be unique
 
     def test_generate_task_id_characters(self):
         """Test that task IDs only contain URL-safe characters"""
-        import string
-
-        from nanoagent.models.schemas import generate_task_id
-
         valid_chars = set(string.ascii_letters + string.digits + "-_")
 
         for _ in range(50):
