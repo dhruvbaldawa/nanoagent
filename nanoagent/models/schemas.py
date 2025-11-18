@@ -36,6 +36,7 @@ class Task(BaseModel):
     description: str = Field(..., description="Task description", min_length=1)
     status: TaskStatus = Field(default=TaskStatus.PENDING, description="Task status")
     priority: int = Field(default=5, ge=1, le=10, description="Task priority (1-10)")
+    result: str | None = Field(default=None, description="Execution result (if task completed)")
 
 
 class TaskPlanOutput(BaseModel):
