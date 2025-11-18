@@ -15,11 +15,61 @@ A lightweight multi-agent framework (<500 LOC) using Pydantic AI for autonomous 
 
 - Python 3.14+
 - uv (2025 standard package manager)
+- API keys for at least one LLM provider (Anthropic, OpenAI, OpenRouter, etc.)
 
 ### Installation
 
 ```bash
 uv sync
+```
+
+### Configuration
+
+Nanoagent supports multiple LLM providers through Pydantic AI. Configure which model each agent uses via environment variables:
+
+```bash
+# Required: Specify model for each agent (format: 'provider:model-name')
+export TASK_PLANNER_MODEL="anthropic:claude-sonnet-4-5-20250514"
+export EXECUTOR_MODEL="openrouter:anthropic/claude-3.5-sonnet"
+export REFLECTOR_MODEL="openai:gpt-4o"
+
+# Set API keys for your chosen providers
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+export OPENROUTER_API_KEY="sk-or-..."  # Only needed if using OpenRouter
+```
+
+**Supported Providers:**
+- `anthropic`: Claude models (requires ANTHROPIC_API_KEY)
+- `openai`: GPT models (requires OPENAI_API_KEY)
+- `openrouter`: Multi-provider via OpenRouter (requires OPENROUTER_API_KEY)
+- `google-gemini`: Google Gemini models (requires GOOGLE_API_KEY)
+- `groq`: Groq models (requires GROQ_API_KEY)
+- And 9+ other providers supported by Pydantic AI
+
+**Model Format:**
+Each model must be specified as `provider:model-identifier`. Examples:
+- `anthropic:claude-sonnet-4-5-20250514`
+- `openai:gpt-4o`
+- `openrouter:anthropic/claude-3.5-sonnet`
+- `openrouter:openai/gpt-4-turbo`
+- `google-gemini:gemini-1.5-pro`
+
+**Per-Agent Configuration:**
+You can use different models for different agents. For example:
+- Use a fast/cheap model for TaskPlanner and Executor
+- Use a capable model for Reflector (critical decision-making)
+
+```bash
+# Cost-optimized setup
+export TASK_PLANNER_MODEL="openai:gpt-4o-mini"
+export EXECUTOR_MODEL="openai:gpt-4o-mini"
+export REFLECTOR_MODEL="openai:gpt-4o"
+
+# All Anthropic
+export TASK_PLANNER_MODEL="anthropic:claude-haiku-3-5-20251022"
+export EXECUTOR_MODEL="anthropic:claude-sonnet-4-5-20250514"
+export REFLECTOR_MODEL="anthropic:claude-sonnet-4-5-20250514"
 ```
 
 ### Running Quality Checks
@@ -42,6 +92,28 @@ uv run ruff check . || exit 1
 uv run basedpyright || exit 1
 uv run pytest || exit 1
 ```
+
+### Running the Demo
+
+The included toy demo showcases the full orchestration flow:
+
+```bash
+# First, set up your configuration
+export TASK_PLANNER_MODEL="anthropic:claude-sonnet-4-5-20250514"
+export EXECUTOR_MODEL="anthropic:claude-sonnet-4-5-20250514"
+export REFLECTOR_MODEL="anthropic:claude-sonnet-4-5-20250514"
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+# Run the demo
+uv run python examples/toy_demo.py
+```
+
+The demo will:
+1. Ask for a goal
+2. Decompose it into tasks (TaskPlanner)
+3. Execute the first 3 tasks (Executor)
+4. Reflect on progress and identify gaps (Reflector)
+5. Display results and suggestions
 
 ### Pre-commit Hooks
 
