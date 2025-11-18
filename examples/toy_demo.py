@@ -28,17 +28,21 @@ async def main() -> None:
         print("  - TASK_PLANNER_MODEL (e.g., 'anthropic:claude-sonnet-4-5-20250514')")
         print("  - EXECUTOR_MODEL (e.g., 'openrouter:anthropic/claude-3.5-sonnet')")
         print("  - REFLECTOR_MODEL (e.g., 'openai:gpt-4o')")
-        print("\nAlso set corresponding API keys:")
-        print("  - ANTHROPIC_API_KEY (for Anthropic models)")
-        print("  - OPENAI_API_KEY (for OpenAI models)")
-        print("  - OPENROUTER_API_KEY (for OpenRouter models)")
-        print("\nExample setup:")
+        print("\nAPI Keys - You only need keys for the providers you're using:")
+        print("  - ANTHROPIC_API_KEY (if using 'anthropic:' models)")
+        print("  - OPENAI_API_KEY (if using 'openai:' models)")
+        print("  - OPENROUTER_API_KEY (if using 'openrouter:' models)")
+        print("\nExample setup (using Anthropic):")
         print("  export TASK_PLANNER_MODEL='anthropic:claude-sonnet-4-5-20250514'")
         print("  export EXECUTOR_MODEL='anthropic:claude-sonnet-4-5-20250514'")
         print("  export REFLECTOR_MODEL='anthropic:claude-sonnet-4-5-20250514'")
         print("  export ANTHROPIC_API_KEY='sk-ant-...'")
-        print("\nDetailed error:")
-        print(str(e))
+        print("\nValidation errors:")
+        # Sanitize error output - extract field names/messages without values
+        for error in e.errors():
+            field = error.get("loc", ("unknown",))[0]
+            msg = error.get("msg", "validation failed")
+            print(f"  - {field}: {msg}")
         sys.exit(1)
 
     print("\n" + "=" * 70)
@@ -47,9 +51,6 @@ async def main() -> None:
 
     # Get goal from user
     goal = input("\nEnter your goal: ").strip()
-    if not goal:
-        print("❌ Goal cannot be empty")
-        sys.exit(1)
 
     print(f"\n📝 Planning goal: {goal}")
     print("-" * 70)
@@ -58,17 +59,21 @@ async def main() -> None:
     try:
         plan_output = await plan_tasks(goal)
         if not plan_output:
-            print("❌ Planning failed (API error)")
+            # Agent returns None for API/network errors, already logged by agent
+            print("❌ Planning failed: API or network error occurred")
+            print("\nPossible causes:")
+            print("  - Invalid API key or authentication failure")
+            print("  - Network connectivity issue")
+            print("  - LLM service temporarily unavailable")
+            print("\nVerify your configuration:")
+            print("  - TASK_PLANNER_MODEL is set and valid")
+            print("  - Corresponding API key is set and correct")
+            print("  - Network connectivity is working")
             sys.exit(1)
     except ValueError as e:
-        print(f"❌ Planning validation failed: {e}")
-        sys.exit(1)
-    except RuntimeError as e:
-        print(f"❌ Planning API error: {e}")
-        print("\nVerify your configuration:")
-        print("  - TASK_PLANNER_MODEL is set and valid")
-        print("  - Corresponding API key is set (e.g., ANTHROPIC_API_KEY)")
-        print("  - Model format is 'provider:model-name'")
+        # Raised when LLM output doesn't match expected schema
+        print("❌ Planning validation failed: LLM output was invalid")
+        print(f"Details: {e}")
         sys.exit(1)
 
     # Show planned tasks
@@ -123,11 +128,12 @@ async def main() -> None:
             todo_mgr.mark_done(next_task.id, str(e))
             failed += 1
         except Exception as e:
-            print(f"❌ Unexpected error: {type(e).__name__}: {e}")
+            # Catch unexpected errors but mark task done and continue
+            print(f"❌ Task error ({type(e).__name__}): {e}")
             todo_mgr.mark_done(next_task.id, str(e))
             failed += 1
 
-    # Reflection phase
+    # Reflection phase (non-blocking - errors don't stop the demo)
     print("\n" + "=" * 70)
     print("🔍 Reflecting on progress...")
     print("=" * 70)
@@ -154,11 +160,17 @@ async def main() -> None:
                 print(f"  - {task}")
 
     except ValueError as e:
+        # Validation error - task data issue
         print(f"⚠️  Reflection validation error: {e}")
+    except TypeError as e:
+        # Type error - internal data structure issue
+        print(f"⚠️  Reflection data error: {e}")
     except RuntimeError as e:
+        # API/network error
         print(f"⚠️  Reflection API error: {e}")
         print("     (Check REFLECTOR_MODEL and corresponding API key)")
     except Exception as e:
+        # Any other unexpected error - reflection is optional, continue anyway
         print(f"⚠️  Reflection skipped: {type(e).__name__}: {e}")
 
     # Summary
