@@ -20,8 +20,8 @@ Implement TodoManager as a plain Python class for task queue management. Follow 
 - [x] Tests cover: empty queue, single task, multiple priorities, mark_done updates, edge cases
 - [x] get_next returns highest priority pending task
 - [x] Completed tasks are tracked correctly
-- [x] `uv run test nanoagent/core/todo_manager_test.py` passes
-- [x] `uv run check` passes
+- [x] `uv run pytest nanoagent/core/todo_manager_test.py` passes
+- [x] `uv run ruff check` passes
 
 ## LLM Prompt
 <prompt>
@@ -63,7 +63,7 @@ Implement TodoManager as a plain Python class for task queue management. Follow 
 **Validation:**
 - All tests in todo_manager_test.py pass
 - Implementation ~60 LOC
-- Run `uv run check` - no errors
+- Run `uv run ruff check` - no errors
 </prompt>
 
 ## Notes

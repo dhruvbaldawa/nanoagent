@@ -20,8 +20,8 @@ Implement TaskPlanner as a Pydantic AI agent that decomposes goals into tasks. F
 - [ ] Tests validate TaskPlanOutput structure is correctly parsed
 - [ ] Agent produces 3-7 tasks for typical goals
 - [ ] Questions list works for ambiguous goals
-- [ ] `uv run test nanoagent/core/task_planner_test.py` passes (may use real API)
-- [ ] `uv run check` passes
+- [ ] `uv run pytest nanoagent/core/task_planner_test.py` passes (may use real API)
+- [ ] `uv run ruff check` passes
 
 ## LLM Prompt
 <prompt>
@@ -65,7 +65,7 @@ async def test_planner_simple_goal():
 **Validation:**
 - Tests call real agent and pass
 - Structured outputs parse correctly (Critical Risk #1 validated)
-- Run `uv run check` - no errors
+- Run `uv run ruff check` - no errors
 - If tests fail: architecture needs revision
 </prompt>
 

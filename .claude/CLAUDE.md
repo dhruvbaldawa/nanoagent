@@ -17,11 +17,10 @@ Lightweight multi-agent framework (<500 LOC) using Pydantic AI for autonomous ta
 
 ```bash
 uv sync                # Install dependencies from uv.lock
-uv run format          # Format code with ruff
-uv run lint            # Lint with ruff
-uv run typecheck       # Type check with basedpyright
-uv run test            # Run tests with pytest
-uv run check           # Run all checks (lint + typecheck + test)
+uv run ruff format          # Format code with ruff
+uv run ruff check            # Lint with ruff
+uv run basedpyright       # Type check with basedpyright
+uv run pytest            # Run tests with pytest
 ```
 
 ### Key Principles

@@ -18,8 +18,8 @@ Define all 5 Pydantic data models (Task, TaskPlanOutput, ExecutionResult, Reflec
 - [x] schemas.py contains all 5 models matching DESIGN.md
 - [x] schemas_test.py has tests for each model's validation
 - [x] Tests cover: valid inputs, missing required fields, invalid types, edge cases
-- [x] `uv run test nanoagent/models/` passes
-- [x] `uv run check` passes
+- [x] `uv run pytest nanoagent/models/` passes
+- [x] `uv run ruff check` passes
 
 ## LLM Prompt
 <prompt>
@@ -65,8 +65,8 @@ def test_model_invalid_literal():
 **Validation:**
 - All 5 models defined in schemas.py
 - Comprehensive test coverage in schemas_test.py
-- Run `uv run test nanoagent/models/` - all tests pass
-- Run `uv run check` - no linting or type errors
+- Run `uv run pytest nanoagent/models/` - all tests pass
+- Run `uv run ruff check` - no linting or type errors
 </prompt>
 
 ## Notes

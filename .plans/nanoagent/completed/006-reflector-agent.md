@@ -21,8 +21,8 @@ Implement Reflector as a Pydantic AI agent that evaluates progress and identifie
 - [x] Reflector identifies missing information correctly
 - [x] Reflector suggests relevant new tasks
 - [x] Reflector marks tasks complete appropriately
-- [x] `uv run test nanoagent/core/reflector_test.py` passes
-- [x] `uv run check` passes
+- [x] `uv run pytest nanoagent/core/reflector_test.py` passes
+- [x] `uv run ruff check` passes
 
 ## LLM Prompt
 <prompt>
@@ -67,7 +67,7 @@ Implement Reflector as a Pydantic AI agent that evaluates progress and identifie
 - Tests prove reflection makes sensible decisions
 - ReflectionOutput parsing works (Critical Risk #1 validated)
 - Gap identification works (Critical Risk #3 validated)
-- Run `uv run check` - no errors
+- Run `uv run ruff check` - no errors
 </prompt>
 
 ## Notes

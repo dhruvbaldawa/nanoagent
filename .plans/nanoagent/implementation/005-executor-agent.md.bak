@@ -21,8 +21,8 @@ Implement Executor as a Pydantic AI agent that executes tasks using tools. Follo
 - [ ] Tests validate ExecutionResult structure parsing
 - [ ] Tool calling mechanism works (agent can call registered tools)
 - [ ] Dependencies correctly passed to tools via RunContext
-- [ ] `uv run test nanoagent/core/executor_test.py` passes
-- [ ] `uv run check` passes
+- [ ] `uv run pytest nanoagent/core/executor_test.py` passes
+- [ ] `uv run ruff check` passes
 
 ## LLM Prompt
 <prompt>
@@ -64,7 +64,7 @@ async def mock_tool(ctx: RunContext[ExecutorDeps], param: str) -> str:
 - Tests with mock tools pass
 - ExecutionResult parsing works (Critical Risk #1 validated)
 - Tool calling mechanism proven
-- Run `uv run check` - no errors
+- Run `uv run ruff check` - no errors
 </prompt>
 
 ## Notes

@@ -14,7 +14,7 @@ Initialize Python project with uv, configure quality tools (ruff 120-char lines,
 - Pre-commit hooks configured with sync-with-uv for version management
 - uv.lock committed to git for reproducibility
 - Project structure: nanoagent/core/, nanoagent/models/, nanoagent/tools/
-- All quality checks passing (`uv run check`)
+- All quality checks passing (`uv run ruff check`)
 - Pre-commit hooks run successfully on empty project
 
 ## Validation
@@ -60,7 +60,7 @@ Initialize Python project with uv, configure quality tools (ruff 120-char lines,
 
 **Validation:**
 - Run `uv sync` - should complete without errors
-- Run `uv run check` - all tools should run successfully
+- Run `uv run ruff check` - all tools should run successfully
 - Run `pre-commit run --all-files` - should pass
 - Verify uv.lock exists and is tracked in git
 - Confirm directory structure matches: nanoagent/{core,models,tools}/
