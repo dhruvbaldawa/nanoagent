@@ -1,28 +1,34 @@
 # ABOUTME: Pytest configuration for nanoagent project
-# ABOUTME: Sets up safety guards and shared fixtures for all tests
+# ABOUTME: Injects TestingSettings and controls LLM test execution
 
 import os
 
 import pytest
 from pydantic_ai import models
 
-# Check if a REAL API key exists BEFORE setting any dummy key
-# Export this so test modules can check it in their skipif decorators
-HAS_REAL_API_KEY = bool(os.getenv("ANTHROPIC_API_KEY"))
+# Set dummy API keys FIRST, before importing config or agents
+# This ensures agents can initialize even without real keys
+os.environ.setdefault("ANTHROPIC_API_KEY", "dummy-key-for-testing")
+os.environ.setdefault("OPENAI_API_KEY", "dummy-key-for-testing")
+os.environ.setdefault("OPENROUTER_API_KEY", "dummy-key-for-testing")
 
-# Set dummy API key if not available - allows agent initialization without crashing
-# Agents need an API key to initialize, even if they'll use TestModel in tests
-if not HAS_REAL_API_KEY:
-    os.environ["ANTHROPIC_API_KEY"] = "dummy-key-for-testing"
+# Now safe to import config - agents will initialize with dummy keys
+from nanoagent.config import TestingSettings, set_settings
 
-# Allow API calls only if a real API key was provided
-# Tests that need real API calls will be skipped via require_real_api_key fixture
-# Tests that use TestModel.override() work regardless of ALLOW_MODEL_REQUESTS
-models.ALLOW_MODEL_REQUESTS = HAS_REAL_API_KEY
+# Inject test settings with defaults before any agent modules are imported
+# This ensures agents use TestingSettings (Anthropic defaults) for tests
+set_settings(TestingSettings())
+
+# Explicit flag - user controls when real LLM calls are allowed
+# Set ALLOW_MODEL_REQUESTS=true to run tests that make real API calls
+ALLOW_REAL_API_CALLS = os.getenv("ALLOW_MODEL_REQUESTS", "").lower() in ("true", "1", "yes")
+
+# Allow API calls only if explicitly enabled
+models.ALLOW_MODEL_REQUESTS = ALLOW_REAL_API_CALLS
 
 
 @pytest.fixture
 def require_real_api_key() -> None:
-    """Skip test if no real ANTHROPIC_API_KEY is available (for real LLM tests)."""
-    if not HAS_REAL_API_KEY:
-        pytest.skip("ANTHROPIC_API_KEY not set (required for real LLM calls)")
+    """Skip test if real LLM calls not enabled via ALLOW_MODEL_REQUESTS."""
+    if not ALLOW_REAL_API_CALLS:
+        pytest.skip("Set ALLOW_MODEL_REQUESTS=true to run real LLM tests")

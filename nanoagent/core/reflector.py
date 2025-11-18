@@ -6,6 +6,7 @@ import logging
 import httpx
 from pydantic_ai import Agent, ModelHTTPError, UnexpectedModelBehavior
 
+from nanoagent.config import get_settings
 from nanoagent.models.schemas import ReflectionOutput, Task
 
 logger = logging.getLogger(__name__)
@@ -40,10 +41,11 @@ Be thorough in your analysis but concise in your output. Focus on what's missing
 
 # Initialize reflector agent with Pydantic AI
 # Agent[None, ReflectionOutput] means: no dependencies, returns ReflectionOutput
+# Model is configured via settings (REFLECTOR_MODEL env var)
 # type: ignore[assignment] - Pydantic AI's generic type system doesn't properly propagate
 # at initialization time, but the agent is correctly configured at runtime
 reflector: Agent[None, ReflectionOutput] = Agent(  # type: ignore[assignment]
-    model="anthropic:claude-sonnet-4-5-20250514",
+    model=get_settings().get_model_instance(get_settings().reflector_model),
     output_type=ReflectionOutput,
     system_prompt=SYSTEM_PROMPT,
 )

@@ -7,6 +7,7 @@ import httpx
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelHTTPError, UnexpectedModelBehavior
 
+from nanoagent.config import get_settings
 from nanoagent.models.schemas import ExecutionResult
 
 logger = logging.getLogger(__name__)
@@ -37,10 +38,11 @@ Provide thorough output that explains your reasoning and what you accomplished."
 
 # Initialize executor agent with Pydantic AI
 # Agent[ExecutorDeps, ExecutionResult] means: takes ExecutorDeps, returns ExecutionResult
+# Model is configured via settings (EXECUTOR_MODEL env var)
 # type: ignore[assignment] - Pydantic AI's generic type system doesn't properly propagate
 # at initialization time, but the agent is correctly configured at runtime
 executor: Agent[ExecutorDeps, ExecutionResult] = Agent(  # type: ignore[assignment]
-    model="anthropic:claude-sonnet-4-5-20250514",
+    model=get_settings().get_model_instance(get_settings().executor_model),
     output_type=ExecutionResult,
     deps_type=ExecutorDeps,
     system_prompt=SYSTEM_PROMPT,

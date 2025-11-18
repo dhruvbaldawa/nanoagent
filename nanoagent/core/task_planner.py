@@ -6,6 +6,7 @@ import logging
 import httpx
 from pydantic_ai import Agent, ModelHTTPError, UnexpectedModelBehavior
 
+from nanoagent.config import get_settings
 from nanoagent.models.schemas import TaskPlanOutput
 
 logger = logging.getLogger(__name__)
@@ -30,10 +31,11 @@ Always return structured output with your task list and any questions."""
 
 # Initialize task planner agent with Pydantic AI
 # Agent[None, TaskPlanOutput] means: no dependencies (None), output type TaskPlanOutput
+# Model is configured via settings (TASK_PLANNER_MODEL env var)
 # type: ignore[assignment] - Pydantic AI's generic type system doesn't properly propagate
 # at initialization time, but the agent is correctly configured at runtime
 task_planner: Agent[None, TaskPlanOutput] = Agent(  # type: ignore[assignment]
-    model="anthropic:claude-sonnet-4-5-20250514",
+    model=get_settings().get_model_instance(get_settings().task_planner_model),
     output_type=TaskPlanOutput,
     system_prompt=SYSTEM_PROMPT,
 )

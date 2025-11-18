@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# ABOUTME: Interactive demo script that tests TaskPlanner and Executor with real LLMs
-# ABOUTME: Demonstrates full planning → execution flow (manual orchestration)
+# ABOUTME: Interactive demo script that tests all Milestone 1 foundation components with real LLMs
+# ABOUTME: Demonstrates complete orchestration flow: planning → execution → reflection
 
 import asyncio
 import os
@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from nanoagent.core.executor import execute_task
+from nanoagent.core.reflector import reflect_on_progress
 from nanoagent.core.task_planner import plan_tasks
 from nanoagent.core.todo_manager import TodoManager
 
@@ -66,13 +67,15 @@ async def main() -> None:
     # Execute each task
     executed = 0
     failed = 0
+    # Limit execution to avoid excessive API calls in demo
+    max_tasks = min(3, len(task_ids))
 
-    while True:
+    for i in range(max_tasks):
         next_task = todo_mgr.get_next()
         if not next_task:
             break
 
-        print(f"\n▶️  Executing task {executed + failed + 1}/{len(task_ids)}: {next_task.description}")
+        print(f"\n▶️  Executing task {i + 1}/{max_tasks}: {next_task.description}")
         print("-" * 70)
 
         try:
@@ -90,13 +93,43 @@ async def main() -> None:
             todo_mgr.mark_done(next_task.id, str(e))
             failed += 1
 
+    # Reflection phase
+    print("\n" + "=" * 70)
+    print("🔍 Reflecting on progress...")
+    print("=" * 70)
+
+    try:
+        completed_tasks = todo_mgr.get_done()
+        pending_tasks = todo_mgr.get_pending()
+
+        reflection = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+
+        if reflection.done:
+            print("✅ Goal is complete!")
+        else:
+            print("⏳ Goal requires more work")
+
+        if reflection.gaps:
+            print("\n❓ Identified gaps:")
+            for gap in reflection.gaps:
+                print(f"  - {gap}")
+
+        if reflection.new_tasks:
+            print("\n📝 Suggested next steps:")
+            for task in reflection.new_tasks:
+                print(f"  - {task}")
+
+    except Exception as e:
+        print(f"⚠️  Reflection skipped: {e}")
+
     # Summary
     print("\n" + "=" * 70)
     print("📊 Summary")
     print("=" * 70)
-    print(f"✅ Successful: {executed}")
+    print(f"✅ Executed successfully: {executed}")
     print(f"❌ Failed: {failed}")
     print(f"📋 Total planned: {len(task_ids)}")
+    print(f"⏳ Remaining: {len(todo_mgr.get_pending())}")
 
     done_tasks = todo_mgr.get_done()
     if done_tasks:
