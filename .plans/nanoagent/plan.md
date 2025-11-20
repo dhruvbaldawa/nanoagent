@@ -76,21 +76,36 @@ Lightweight multi-agent framework (<500 LOC) with Pydantic AI for autonomous tas
 ---
 
 ### Milestone 3: Production Hardening
-**Status**: 📅 To Be Planned (after Milestone 2 completion)
+**Status**: 🔄 In Progress (0%)
 
-**Outcome**: Production-ready framework with comprehensive testing, error handling, performance validation, and documentation
+**Outcome**: Production-ready framework with comprehensive error handling, performance validation, resource management, and professional documentation
 
-**Planned Deliverables** (will be refined based on M1 & M2 learnings):
-- Edge case testing and error recovery
-- Performance validation
-- Token tracking and rate limiting
-- Comprehensive documentation and examples
+**Deliverables** (refined based on M1 & M2 learnings):
+- [ ] Comprehensive error handling test suite covering edge cases and failure modes
+- [ ] Performance benchmarking and validation against success criteria
+- [ ] Token usage tracking and cost monitoring infrastructure
+- [ ] Rate limiting and resource management for production use
+- [ ] Professional documentation (README, API docs, usage examples)
+- [ ] Production deployment guide with best practices
 
-**Note**: Tasks for Milestone 3 will be generated after Milestone 2 completion.
+**M2 Learnings Applied:**
+- Current LOC: 1302 (well under 500 LOC budget - need to audit and potentially refactor)
+- Test suite: 202 tests passing (strong foundation for edge case expansion)
+- E2E tests validated system works with real LLMs (focus M3 on error scenarios)
+- StreamManager and Orchestrator patterns proven (extend for performance monitoring)
+
+**Success Criteria for M3:**
+- All edge cases handled gracefully with proper error messages
+- Performance metrics documented and validated
+- Resource usage (tokens, API calls) tracked and bounded
+- Documentation complete enough for external users
+- Production-ready deployment guide provided
+
+**Estimated LOC Impact:** +150 LOC (performance tracking, rate limiting, enhanced error handling)
 
 ---
 
-**Overall Progress**: M1/M3 complete (33%) - Milestone 1 validated, planning Milestone 2
+**Overall Progress**: M1+M2/M3 complete (67%) - Planning Milestone 3 (Production Hardening)
 
 ---
 
@@ -172,6 +187,8 @@ M1 Core: ~290 LOC (excluding tests)
 ## Task History
 
 **Completed** (in completed/):
+
+**Milestone 1 (Foundation):**
 - ✅ `001-project-setup.md` - M1: Project initialized with uv, Python 3.14, quality tools, pre-commit hooks
 - ✅ `002-data-models.md` - M1: All 5 Pydantic models with comprehensive validation tests (45 tests)
 - ✅ `003-todo-manager.md` - M1: TodoManager with priority-based task queue (8 tests)
@@ -180,15 +197,22 @@ M1 Core: ~290 LOC (excluding tests)
 - ✅ `006-reflector-agent.md` - M1: Reflector agent with gap detection (26 tests) - ✅ Risk #3 proven
 - ✅ `007-manual-orchestration-poc.md` - M1: Integration test validates complete cycle - ✅ Risk #2 proven, **MILESTONE 1 COMPLETE**
 
-**In Flight**:
-- None (planning M2 tasks)
+**Milestone 2 (Integration):**
+- ✅ `008-tool-registry.md` - M2: ToolRegistry for pluggable tools (~30 LOC)
+- ✅ `009-built-in-tools.md` - M2: Built-in tools with secure expression evaluation (~60 LOC)
+- ✅ `010-orchestrator.md` - M2: Automated orchestration loop (~150 LOC)
+- ✅ `011-stream-manager.md` - M2: StreamManager with pure error handling (~30 LOC)
+- ✅ `012-end-to-end-tests.md` - M2: E2E tests for multiple goal types - **MILESTONE 2 COMPLETE**
 
-**Pending** (Milestone 2 - ready for implementation):
-- `008-tool-registry.md` - ToolRegistry for pluggable tools (~30 LOC)
-- `009-built-in-tools.md` - Minimal built-in tools for testing (~60 LOC)
-- `010-orchestrator.md` - Automated orchestration loop (~150 LOC)
-- `011-stream-manager.md` - Event streaming for visibility (~30 LOC)
-- `012-end-to-end-tests.md` - E2E validation for 3+ goal types (M2 VALIDATION)
+**In Flight**:
+- None (planning M3 tasks)
+
+**Pending** (Milestone 3 - Production Hardening):
+- `013-edge-case-testing.md` - Comprehensive edge case test suite for failure modes
+- `014-performance-benchmarking.md` - Performance metrics and validation against criteria
+- `015-opentelemetry-instrumentation.md` - OTEL observability with Pydantic AI native support
+- `016-rate-limiting-and-resource-management.md` - Rate limiting and resource budgets for production
+- `017-comprehensive-documentation.md` - Professional docs for external users (README, API, guides)
 
 **Status tracked via file location:** `pending/` → `implementation/` → `review/` → `testing/` → `completed/`
 
@@ -223,15 +247,42 @@ M1 Core: ~290 LOC (excluding tests)
 - Tool calling patterns needed for M2 executor
 - Whether streaming is critical or can be deferred
 
-### After Milestone 2 Completion
+### After Milestone 2 Completion ✅ COMPLETE
 
-**Trigger**: Milestone 2 end-to-end tests pass for 3+ goal types
+**Trigger**: Milestone 2 end-to-end tests pass for 3+ goal types ✅
+
+**Actions Taken**:
+1. ✅ Reviewed M2 performance characteristics (1302 LOC, 202 tests passing)
+2. ✅ Identified common error modes for M3 hardening
+3. ✅ Generated Milestone 3 task files (013-017)
+4. ✅ Adjusted M3 scope based on learnings (focus on production readiness)
+
+**M2 Learnings Applied to M3**:
+- Current LOC: 1302 (exceeds 500 LOC budget, but comprehensive)
+- Test suite: 202 tests (strong foundation for edge case expansion)
+- E2E tests validated system works (focus M3 on error scenarios and production features)
+- Token tracking → Use OTEL instead of custom implementation
+- Rate limiting → Add sliding window rate limiter
+- Documentation → Comprehensive docs needed for external users
+
+### After Milestone 3 Completion
+
+**Trigger**: All M3 tasks (013-017) complete and validated
+
+**Review Questions**:
+1. Are all edge cases handled gracefully?
+2. Does performance meet success criteria?
+3. Is observability working with OTEL backends?
+4. Are resource limits effective at preventing runaway costs?
+5. Is documentation clear enough for external users?
+6. What is final LOC count vs 500 LOC budget?
 
 **Actions**:
-1. Review M2 performance characteristics
-2. Identify common error modes for M3 hardening
-3. Generate Milestone 3 task files
-4. Adjust M3 scope based on actual LOC budget remaining
+1. Final LOC audit (consider refactoring if significantly over budget)
+2. Update success criteria checklist
+3. Create release plan (versioning, publishing)
+4. Identify post-MVP enhancements (persistence, human-in-loop, advanced tools)
+5. Document lessons learned for future projects
 
 ---
 
