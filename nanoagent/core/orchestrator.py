@@ -6,6 +6,7 @@ import re
 
 from nanoagent.core.executor import execute_task
 from nanoagent.core.reflector import reflect_on_progress
+from nanoagent.core.stream_manager import StreamManager
 from nanoagent.core.task_planner import plan_tasks
 from nanoagent.core.todo_manager import TodoManager
 from nanoagent.models.schemas import AgentRunResult, AgentStatus, ReflectionOutput, TaskStatus
@@ -53,6 +54,7 @@ class Orchestrator:
         self.max_iterations = max_iterations
         self.registry = registry or ToolRegistry()
         self.todo = TodoManager()
+        self.stream = StreamManager()
         self.context: dict[str, str] = {}
         self.iteration = 0
 
@@ -156,9 +158,18 @@ class Orchestrator:
         if current_task is None:
             return await self._reflect_and_check_completion()
 
+        # Emit task_started event (fire-and-forget, never raises)
+        self.stream.emit("task_started", {"task_id": current_task.id, "description": current_task.description})
+
         # Execute task
         execution_result = await execute_task(current_task.description)
         self.context[current_task.id] = execution_result.output
+
+        # Emit task_completed event (fire-and-forget, never raises)
+        self.stream.emit(
+            "task_completed",
+            {"task_id": current_task.id, "success": execution_result.success, "output": execution_result.output},
+        )
 
         if execution_result.success:
             self.todo.mark_done(current_task.id, execution_result.output)
@@ -190,6 +201,16 @@ class Orchestrator:
         """
         logger.debug("Reflecting on progress")
         reflection = await reflect_on_progress(self.goal, self.todo.get_done(), self.todo.get_pending())
+
+        # Emit reflection event (fire-and-forget, never raises)
+        self.stream.emit(
+            "reflection",
+            {
+                "done": reflection.done if reflection else False,
+                "gaps": reflection.gaps if reflection else [],
+                "new_tasks": reflection.new_tasks if reflection else [],
+            },
+        )
 
         # Handle reflection failure (defensive check - reflector raises exceptions but returns None could happen)
         if reflection is None:  # pyright: ignore[reportUnnecessaryComparison]
