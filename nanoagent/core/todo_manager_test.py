@@ -1,6 +1,7 @@
 # ABOUTME: Unit tests for TodoManager task queue implementation
 # ABOUTME: Validates priority-based task ordering and completion tracking
 
+import pytest
 from _pytest.logging import LogCaptureFixture
 
 from nanoagent.core.todo_manager import TodoManager
@@ -74,13 +75,16 @@ class TestTodoManager:
         pending = manager.get_pending()
         assert len(pending) == 0
 
-    def test_mark_done_nonexistent_task_doesnt_crash(self):
-        """Marking nonexistent task ID doesn't raise exception"""
+    def test_mark_done_nonexistent_task_raises_error(self):
+        """Marking nonexistent task ID raises ValueError"""
         manager = TodoManager()
         manager.add_tasks(["Task"])
 
-        # Should not crash
-        manager.mark_done("nonexistent", "result")
+        # Should raise ValueError
+        with pytest.raises(ValueError, match="Cannot mark nonexistent"):
+            manager.mark_done("nonexistent", "result")
+
+        # Pending should remain unchanged
         pending = manager.get_pending()
         assert len(pending) == 1
 
@@ -189,13 +193,14 @@ class TestTodoManager:
         done_task = manager.get_done()[0]
         assert done_task.result == "Execution completed successfully"
 
-    def test_mark_done_nonexistent_logs_warning(self, caplog: LogCaptureFixture) -> None:
-        """mark_done logs warning for nonexistent task_id"""
+    def test_mark_done_nonexistent_logs_error_and_raises(self, caplog: LogCaptureFixture) -> None:
+        """mark_done logs error and raises ValueError for nonexistent task_id"""
         manager = TodoManager()
         manager.add_tasks(["Task"])
 
-        with caplog.at_level("WARNING"):
-            manager.mark_done("nonexistent", "result")
+        with caplog.at_level("ERROR"):
+            with pytest.raises(ValueError, match="Cannot mark nonexistent"):
+                manager.mark_done("nonexistent", "result")
 
-        assert "Attempted to mark nonexistent task as done" in caplog.text
+        assert "Cannot mark nonexistent task as done" in caplog.text
         assert "nonexistent" in caplog.text

@@ -58,13 +58,16 @@ class TodoManager:
         Args:
             task_id: ID of task to mark done
             result: Result/output of the task execution
+
+        Raises:
+            ValueError: If task_id does not exist in task queue
         """
         if task_id not in self.tasks:
-            logger.warning(
-                "Attempted to mark nonexistent task as done",
+            logger.error(
+                "Cannot mark nonexistent task as done",
                 extra={"task_id": task_id, "total_tasks": len(self.tasks), "completed_count": len(self.completed)},
             )
-            return
+            raise ValueError(f"Cannot mark nonexistent task as done: {task_id} (total tasks: {len(self.tasks)})")
 
         self.tasks[task_id].status = TaskStatus.DONE
         self.tasks[task_id].result = result
