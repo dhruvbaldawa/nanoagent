@@ -10,14 +10,10 @@ from nanoagent.config import Settings, TestingSettings, get_settings, set_settin
 class TestProductionSettings:
     """Test strict production Settings - requires explicit configuration."""
 
-    def test_requires_all_models(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_requires_all_models(self, make_settings) -> None:  # type: ignore[reportUnknownParameterType]
         """Production Settings fails if any model env var missing."""
-        monkeypatch.delenv("TASK_PLANNER_MODEL", raising=False)
-        monkeypatch.delenv("EXECUTOR_MODEL", raising=False)
-        monkeypatch.delenv("REFLECTOR_MODEL", raising=False)
-
         with pytest.raises(ValidationError) as exc_info:
-            Settings()  # type: ignore[call-arg]
+            make_settings(TASK_PLANNER_MODEL=None, EXECUTOR_MODEL=None, REFLECTOR_MODEL=None)
 
         # Should show which fields are missing
         error_str = str(exc_info.value)
@@ -25,105 +21,110 @@ class TestProductionSettings:
         assert "executor_model" in error_str
         assert "reflector_model" in error_str
 
-    def test_validates_model_format(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_validates_model_format(self, make_settings) -> None:  # type: ignore[reportUnknownParameterType]
         """Model must be 'provider:model' format."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "invalid-format")
-        monkeypatch.setenv("EXECUTOR_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("REFLECTOR_MODEL", "openai:gpt-4o")
-
         with pytest.raises(ValidationError, match="provider:model-name"):
-            Settings()  # type: ignore[call-arg]
+            make_settings(
+                TASK_PLANNER_MODEL="invalid-format",
+                EXECUTOR_MODEL="openai:gpt-4o",
+                REFLECTOR_MODEL="openai:gpt-4o",
+            )
 
-    def test_multiple_invalid_models(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_multiple_invalid_models(self, make_settings) -> None:  # type: ignore[reportUnknownParameterType]
         """Multiple invalid models should show all errors."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "bad1")
-        monkeypatch.setenv("EXECUTOR_MODEL", "bad2")
-        monkeypatch.setenv("REFLECTOR_MODEL", "bad3")
-
         with pytest.raises(ValidationError) as exc_info:
-            Settings()  # type: ignore[call-arg]
+            make_settings(
+                TASK_PLANNER_MODEL="bad1",
+                EXECUTOR_MODEL="bad2",
+                REFLECTOR_MODEL="bad3",
+            )
 
         error_str = str(exc_info.value)
         assert "bad1" in error_str or "provider:model-name" in error_str
 
-    def test_valid_models_creates_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_valid_models_creates_settings(self, make_settings) -> None:  # type: ignore[reportUnknownParameterType]
         """Valid model format creates Settings successfully."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("EXECUTOR_MODEL", "anthropic:claude-sonnet-4-5-20250514")
-        monkeypatch.setenv("REFLECTOR_MODEL", "openrouter:meta-llama/llama-3.1-70b")
+        settings = make_settings(  # type: ignore[reportUnknownVariableType]
+            TASK_PLANNER_MODEL="openai:gpt-4o",
+            EXECUTOR_MODEL="anthropic:claude-sonnet-4-5-20250514",
+            REFLECTOR_MODEL="openrouter:meta-llama/llama-3.1-70b",
+        )
+        assert settings.task_planner_model == "openai:gpt-4o"  # type: ignore[reportUnknownMemberType]
+        assert settings.executor_model == "anthropic:claude-sonnet-4-5-20250514"  # type: ignore[reportUnknownMemberType]
+        assert settings.reflector_model == "openrouter:meta-llama/llama-3.1-70b"  # type: ignore[reportUnknownMemberType]
 
-        settings = Settings()  # type: ignore[call-arg]
-        assert settings.task_planner_model == "openai:gpt-4o"
-        assert settings.executor_model == "anthropic:claude-sonnet-4-5-20250514"
-        assert settings.reflector_model == "openrouter:meta-llama/llama-3.1-70b"
-
-    def test_reads_api_keys(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_reads_api_keys(self, make_settings, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[reportUnknownParameterType]
         """Settings reads API keys from environment."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("EXECUTOR_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("REFLECTOR_MODEL", "openai:gpt-4o")
         monkeypatch.setenv("OPENAI_API_KEY", "test-key-openai-123")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-anthropic-456")
         monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-openrouter-789")
 
-        settings = Settings()  # type: ignore[call-arg]
-        assert settings.openai_api_key == "test-key-openai-123"
-        assert settings.anthropic_api_key == "test-key-anthropic-456"
-        assert settings.openrouter_api_key == "test-key-openrouter-789"
+        settings = make_settings(  # type: ignore[reportUnknownVariableType]
+            TASK_PLANNER_MODEL="openai:gpt-4o",
+            EXECUTOR_MODEL="openai:gpt-4o",
+            REFLECTOR_MODEL="openai:gpt-4o",
+        )
+        assert settings.openai_api_key == "test-key-openai-123"  # type: ignore[reportUnknownMemberType]
+        assert settings.anthropic_api_key == "test-key-anthropic-456"  # type: ignore[reportUnknownMemberType]
+        assert settings.openrouter_api_key == "test-key-openrouter-789"  # type: ignore[reportUnknownMemberType]
 
-    def test_api_keys_optional(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_api_keys_optional(self, make_settings, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[reportUnknownParameterType]
         """API keys are optional - Settings works without them."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("EXECUTOR_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("REFLECTOR_MODEL", "openai:gpt-4o")
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
-        settings = Settings()  # type: ignore[call-arg]  # Should not raise
-        assert settings.openai_api_key is None
-        assert settings.anthropic_api_key is None
-        assert settings.openrouter_api_key is None
+        settings = make_settings(  # type: ignore[reportUnknownVariableType]
+            TASK_PLANNER_MODEL="openai:gpt-4o",
+            EXECUTOR_MODEL="openai:gpt-4o",
+            REFLECTOR_MODEL="openai:gpt-4o",
+        )
+        assert settings.openai_api_key is None  # type: ignore[reportUnknownMemberType]
+        assert settings.anthropic_api_key is None  # type: ignore[reportUnknownMemberType]
+        assert settings.openrouter_api_key is None  # type: ignore[reportUnknownMemberType]
 
-    def test_get_model_instance_without_explicit_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_get_model_instance_without_explicit_key(self, make_settings, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[reportUnknownParameterType]
         """Without explicit key, return model string for Pydantic AI."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("EXECUTOR_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("REFLECTOR_MODEL", "openai:gpt-4o")
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
-        settings = Settings()  # type: ignore[call-arg]
-        model = settings.get_model_instance("openai:gpt-4o")
+        settings = make_settings(  # type: ignore[reportUnknownVariableType]
+            TASK_PLANNER_MODEL="openai:gpt-4o",
+            EXECUTOR_MODEL="openai:gpt-4o",
+            REFLECTOR_MODEL="openai:gpt-4o",
+        )
+        model = settings.get_model_instance("openai:gpt-4o")  # type: ignore[reportUnknownMemberType]
         assert isinstance(model, str)
         assert model == "openai:gpt-4o"
 
-    def test_get_model_instance_returns_string(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_get_model_instance_returns_string(self, make_settings, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[reportUnknownParameterType]
         """get_model_instance returns model string for Pydantic AI to handle."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("EXECUTOR_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("REFLECTOR_MODEL", "openai:gpt-4o")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
 
-        settings = Settings()  # type: ignore[call-arg]
-        model = settings.get_model_instance("openai:gpt-4o")
+        settings = make_settings(  # type: ignore[reportUnknownVariableType]
+            TASK_PLANNER_MODEL="openai:gpt-4o",
+            EXECUTOR_MODEL="openai:gpt-4o",
+            REFLECTOR_MODEL="openai:gpt-4o",
+        )
+        model = settings.get_model_instance("openai:gpt-4o")  # type: ignore[reportUnknownMemberType]
 
         # Currently returns string - Pydantic AI handles API key detection
         assert isinstance(model, str)
         assert model == "openai:gpt-4o"
 
-    def test_different_providers_same_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_different_providers_same_settings(self, make_settings, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[reportUnknownParameterType]
         """Can use different providers in same Settings instance."""
-        monkeypatch.setenv("TASK_PLANNER_MODEL", "openai:gpt-4o")
-        monkeypatch.setenv("EXECUTOR_MODEL", "anthropic:claude-sonnet-4-5-20250514")
-        monkeypatch.setenv("REFLECTOR_MODEL", "openrouter:meta-llama/llama-3.1-70b")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-anthropic")
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
 
-        settings = Settings()  # type: ignore[call-arg]
-        assert settings.task_planner_model.startswith("openai:")
-        assert settings.executor_model.startswith("anthropic:")
-        assert settings.reflector_model.startswith("openrouter:")
+        settings = make_settings(  # type: ignore[reportUnknownVariableType]
+            TASK_PLANNER_MODEL="openai:gpt-4o",
+            EXECUTOR_MODEL="anthropic:claude-sonnet-4-5-20250514",
+            REFLECTOR_MODEL="openrouter:meta-llama/llama-3.1-70b",
+        )
+        assert settings.task_planner_model.startswith("openai:")  # type: ignore[reportUnknownMemberType]
+        assert settings.executor_model.startswith("anthropic:")  # type: ignore[reportUnknownMemberType]
+        assert settings.reflector_model.startswith("openrouter:")  # type: ignore[reportUnknownMemberType]
 
 
 class TestTestingSettings:

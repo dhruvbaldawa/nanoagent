@@ -1,5 +1,7 @@
 # ABOUTME: Configuration module for per-agent LLM model selection
 # ABOUTME: Supports production (strict) and test (permissive) settings with explicit API key passing
+import os
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -46,7 +48,9 @@ class Settings(BaseSettings):
         # Future: Can create explicit model instances with api_key passed in
         return model_str
 
-    model_config = SettingsConfigDict(env_prefix="")  # Read exact environment variable names
+    model_config = SettingsConfigDict(
+        env_file=Path(os.getcwd()) / ".env", env_prefix=""
+    )  # Read exact environment variable names
 
 
 class ProductionSettings(Settings):
@@ -62,7 +66,7 @@ class TestingSettings(Settings):
     executor_model: str = "anthropic:claude-sonnet-4-5-20250514"
     reflector_model: str = "anthropic:claude-sonnet-4-5-20250514"
 
-    model_config = SettingsConfigDict(env_prefix="")
+    model_config = SettingsConfigDict(env_file=None, env_prefix="")
 
 
 # Global settings instance - can be overridden via set_settings()
