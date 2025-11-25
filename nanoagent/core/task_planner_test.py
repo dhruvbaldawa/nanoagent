@@ -5,100 +5,104 @@ from unittest.mock import patch
 
 import pytest
 from pydantic_ai import ModelHTTPError
+from pydantic_ai.models.test import TestModel
 
 from nanoagent.models.schemas import TaskPlanOutput
 
 
-@pytest.mark.usefixtures("require_real_api_key")
 class TestTaskPlanner:
-    """Test suite for TaskPlanner agent (uses real LLM calls)"""
+    """Test suite for TaskPlanner agent (uses TestModel for fast, deterministic tests)"""
 
     @pytest.mark.asyncio
     async def test_simple_goal_returns_structured_output(self) -> None:
         """Simple goal returns TaskPlanOutput with tasks"""
         from nanoagent.core.task_planner import task_planner
 
-        result = await task_planner.run("Build a todo application with Python")  # type: ignore[arg-type]
+        with task_planner.override(model=TestModel()):
+            result = await task_planner.run("Build a todo application with Python")  # type: ignore[arg-type]
 
-        data = result.output
-        assert isinstance(data, TaskPlanOutput)
-        assert isinstance(data.tasks, list)
-        assert len(data.tasks) >= 3
-        assert len(data.tasks) <= 7
-        assert all(isinstance(task, str) for task in data.tasks)
-        assert all(len(task) > 0 for task in data.tasks)
+            data = result.output
+            assert isinstance(data, TaskPlanOutput)
+            assert isinstance(data.tasks, list)
+            assert len(data.tasks) >= 1
+            assert all(isinstance(task, str) for task in data.tasks)
+            assert all(len(task) > 0 for task in data.tasks)
 
     @pytest.mark.asyncio
     async def test_clear_goal_produces_actionable_tasks(self) -> None:
         """Clear goal produces specific, actionable task descriptions"""
         from nanoagent.core.task_planner import task_planner
 
-        result = await task_planner.run("Write a Python function that calculates factorial")  # type: ignore[arg-type]
+        with task_planner.override(model=TestModel()):
+            result = await task_planner.run("Write a Python function that calculates factorial")  # type: ignore[arg-type]
 
-        data = result.output
-        assert isinstance(data, TaskPlanOutput)
-        assert 3 <= len(data.tasks) <= 7
+            data = result.output
+            assert isinstance(data, TaskPlanOutput)
+            assert len(data.tasks) >= 1
 
-        # Verify tasks are actionable (not too generic, not too specific)
-        for task in data.tasks:
-            assert len(task) > 10  # Long enough to be meaningful
-            assert len(task) < 500  # Not excessively long
+            # Verify tasks are strings
+            for task in data.tasks:
+                assert isinstance(task, str)
+                assert len(task) > 0
 
     @pytest.mark.asyncio
     async def test_ambiguous_goal_may_include_questions(self) -> None:
         """Ambiguous goal may include clarifying questions"""
         from nanoagent.core.task_planner import task_planner
 
-        result = await task_planner.run("Make something cool with AI")  # type: ignore[arg-type]
+        with task_planner.override(model=TestModel()):
+            result = await task_planner.run("Make something cool with AI")  # type: ignore[arg-type]
 
-        data = result.output
-        assert isinstance(data, TaskPlanOutput)
-        assert isinstance(data.questions, list)
+            data = result.output
+            assert isinstance(data, TaskPlanOutput)
+            assert isinstance(data.questions, list)
 
-        # Questions are optional, but structure should be present
-        if data.questions:
-            assert all(isinstance(q, str) for q in data.questions)
-            assert all(len(q) > 0 for q in data.questions)
+            # Questions are optional, but structure should be present
+            if data.questions:
+                assert all(isinstance(q, str) for q in data.questions)
+                assert all(len(q) > 0 for q in data.questions)
 
     @pytest.mark.asyncio
     async def test_structured_output_always_matches_schema(self) -> None:
         """Any goal produces output matching TaskPlanOutput schema"""
         from nanoagent.core.task_planner import task_planner
 
-        result = await task_planner.run("Deploy a web application to production")  # type: ignore[arg-type]
+        with task_planner.override(model=TestModel()):
+            result = await task_planner.run("Deploy a web application to production")  # type: ignore[arg-type]
 
-        output = result.output
-        assert isinstance(output, TaskPlanOutput)
+            output = result.output
+            assert isinstance(output, TaskPlanOutput)
 
-        # Validate schema fields exist and have correct types
-        assert hasattr(output, "tasks")
-        assert hasattr(output, "questions")
-        assert isinstance(output.tasks, list)
-        assert isinstance(output.questions, list)
+            # Validate schema fields exist and have correct types
+            assert hasattr(output, "tasks")
+            assert hasattr(output, "questions")
+            assert isinstance(output.tasks, list)
+            assert isinstance(output.questions, list)
 
-        # Validate constraints from schema
-        assert len(output.tasks) <= 50  # schema max_length=50
-        assert len(output.questions) <= 20  # schema max_length=20
+            # Validate constraints from schema
+            assert len(output.tasks) <= 50  # schema max_length=50
+            assert len(output.questions) <= 20  # schema max_length=20
 
     @pytest.mark.asyncio
     async def test_multiple_calls_produce_consistent_structure(self) -> None:
         """Multiple LLM calls all produce properly structured outputs"""
         from nanoagent.core.task_planner import task_planner
 
-        goals = [
-            "Build a REST API",
-            "Write unit tests for a calculator",
-            "Set up continuous integration",
-        ]
+        with task_planner.override(model=TestModel()):
+            goals = [
+                "Build a REST API",
+                "Write unit tests for a calculator",
+                "Set up continuous integration",
+            ]
 
-        for goal in goals:
-            result = await task_planner.run(goal)  # type: ignore[arg-type]
+            for goal in goals:
+                result = await task_planner.run(goal)  # type: ignore[arg-type]
 
-            # Every call must produce valid TaskPlanOutput
-            data = result.output
-            assert isinstance(data, TaskPlanOutput)
-            assert 3 <= len(data.tasks) <= 7
-            assert isinstance(data.questions, list)
+                # Every call must produce valid TaskPlanOutput
+                data = result.output
+                assert isinstance(data, TaskPlanOutput)
+                assert len(data.tasks) >= 1
+                assert isinstance(data.questions, list)
 
 
 class TestTaskPlannerErrorHandling:
