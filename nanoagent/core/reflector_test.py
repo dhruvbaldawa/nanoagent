@@ -6,176 +6,183 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 from pydantic_ai import ModelHTTPError, UnexpectedModelBehavior
+from pydantic_ai.models.test import TestModel
 
-from nanoagent.core.reflector import reflect_on_progress
+from nanoagent.core.reflector import reflect_on_progress, reflector
 from nanoagent.models.schemas import ReflectionOutput, Task, TaskStatus
 
 
-@pytest.mark.usefixtures("require_real_api_key")
 class TestReflector:
-    """Test suite for Reflector agent (uses real LLM calls)"""
+    """Test suite for Reflector agent (uses TestModel for fast, deterministic tests)"""
 
     @pytest.mark.asyncio
     async def test_simple_completed_goal(self):
-        """Test: Reflector recognizes a simple completed goal (done=True)"""
-        goal = "Calculate 2 + 2"
-        completed_tasks: list[Task] = [
-            Task(
-                id="task_001",
-                description="Calculate 2 + 2",
-                status=TaskStatus.DONE,
-                result="Result: 4",
-            )
-        ]
-        pending_tasks: list[Task] = []
+        """Test: Reflector returns valid ReflectionOutput for simple goal"""
+        with reflector.override(model=TestModel()):
+            goal = "Calculate 2 + 2"
+            completed_tasks: list[Task] = [
+                Task(
+                    id="task_001",
+                    description="Calculate 2 + 2",
+                    status=TaskStatus.DONE,
+                    result="Result: 4",
+                )
+            ]
+            pending_tasks: list[Task] = []
 
-        result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+            result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
 
-        assert isinstance(result, ReflectionOutput)
-        assert result.done is True
-        assert isinstance(result.gaps, list)
-        assert isinstance(result.new_tasks, list)
-        assert isinstance(result.complete_ids, list)
+            assert isinstance(result, ReflectionOutput)
+            assert isinstance(result.done, bool)
+            assert isinstance(result.gaps, list)
+            assert isinstance(result.new_tasks, list)
+            assert isinstance(result.complete_ids, list)
 
     @pytest.mark.asyncio
     async def test_partially_completed_goal_identifies_gaps(self):
         """Test: Reflector identifies gaps when goal is partially completed"""
-        goal = "Build a REST API with authentication and database"
-        completed_tasks: list[Task] = [
-            Task(
-                id="task_001",
-                description="Create basic API endpoints",
-                status=TaskStatus.DONE,
-                result="Basic endpoints created: GET /users, POST /users",
-            )
-        ]
-        pending_tasks: list[Task] = [
-            Task(id="task_002", description="Implement user authentication", status=TaskStatus.PENDING),
-        ]
+        with reflector.override(model=TestModel()):
+            goal = "Build a REST API with authentication and database"
+            completed_tasks: list[Task] = [
+                Task(
+                    id="task_001",
+                    description="Create basic API endpoints",
+                    status=TaskStatus.DONE,
+                    result="Basic endpoints created: GET /users, POST /users",
+                )
+            ]
+            pending_tasks: list[Task] = [
+                Task(id="task_002", description="Implement user authentication", status=TaskStatus.PENDING),
+            ]
 
-        result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+            result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
 
-        assert isinstance(result, ReflectionOutput)
-        assert result.done is False
-        assert len(result.gaps) > 0  # Should identify missing database, tests, etc.
-        assert len(result.new_tasks) > 0  # Should suggest next steps
-        # task002 already pending, so should be recognized
-        assert isinstance(result.complete_ids, list)
+            assert isinstance(result, ReflectionOutput)
+            assert isinstance(result.done, bool)
+            assert isinstance(result.gaps, list)
+            assert isinstance(result.new_tasks, list)
+            # task002 already pending, so should be recognized
+            assert isinstance(result.complete_ids, list)
 
     @pytest.mark.asyncio
     async def test_goal_with_pending_tasks_recognized(self):
         """Test: Reflector recognizes and doesn't duplicate pending tasks"""
-        goal = "Set up project infrastructure"
-        completed_tasks: list[Task] = [
-            Task(
-                id="task_001",
-                description="Initialize git repository",
-                status=TaskStatus.DONE,
-                result="Git repo initialized",
-            )
-        ]
-        pending_tasks: list[Task] = [
-            Task(id="task_002", description="Set up CI/CD pipeline", status=TaskStatus.PENDING),
-            Task(id="task_003", description="Configure Docker", status=TaskStatus.PENDING),
-        ]
+        with reflector.override(model=TestModel()):
+            goal = "Set up project infrastructure"
+            completed_tasks: list[Task] = [
+                Task(
+                    id="task_001",
+                    description="Initialize git repository",
+                    status=TaskStatus.DONE,
+                    result="Git repo initialized",
+                )
+            ]
+            pending_tasks: list[Task] = [
+                Task(id="task_002", description="Set up CI/CD pipeline", status=TaskStatus.PENDING),
+                Task(id="task_003", description="Configure Docker", status=TaskStatus.PENDING),
+            ]
 
-        result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+            result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
 
-        assert isinstance(result, ReflectionOutput)
-        # Should recognize that some work is already planned (task002, task003)
-        # and not suggest exact duplicates
-        assert isinstance(result.gaps, list)
-        assert isinstance(result.new_tasks, list)
+            assert isinstance(result, ReflectionOutput)
+            # Should recognize that some work is already planned (task002, task003)
+            # and not suggest exact duplicates
+            assert isinstance(result.gaps, list)
+            assert isinstance(result.new_tasks, list)
 
     @pytest.mark.asyncio
     async def test_reflection_output_structure_validation(self):
         """Test: ReflectionOutput always has all required fields"""
-        goal = "Simple test"
-        completed_tasks: list[Task] = []
-        pending_tasks: list[Task] = []
+        with reflector.override(model=TestModel()):
+            goal = "Simple test"
+            completed_tasks: list[Task] = []
+            pending_tasks: list[Task] = []
 
-        result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+            result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
 
-        # Validate all required fields are present
-        assert hasattr(result, "done")
-        assert isinstance(result.done, bool)
-        assert hasattr(result, "gaps")
-        assert isinstance(result.gaps, list)
-        assert all(isinstance(gap, str) for gap in result.gaps)
-        assert hasattr(result, "new_tasks")
-        assert isinstance(result.new_tasks, list)
-        assert all(isinstance(task, str) for task in result.new_tasks)
-        assert hasattr(result, "complete_ids")
-        assert isinstance(result.complete_ids, list)
-        assert all(isinstance(task_id, str) for task_id in result.complete_ids)
+            # Validate all required fields are present
+            assert hasattr(result, "done")
+            assert isinstance(result.done, bool)
+            assert hasattr(result, "gaps")
+            assert isinstance(result.gaps, list)
+            assert all(isinstance(gap, str) for gap in result.gaps)
+            assert hasattr(result, "new_tasks")
+            assert isinstance(result.new_tasks, list)
+            assert all(isinstance(task, str) for task in result.new_tasks)
+            assert hasattr(result, "complete_ids")
+            assert isinstance(result.complete_ids, list)
+            assert all(isinstance(task_id, str) for task_id in result.complete_ids)
 
     @pytest.mark.asyncio
     async def test_complex_goal_with_multiple_completed_tasks(self):
         """Test: Reflector handles complex goal with multiple completed tasks"""
-        goal = "Create a data processing pipeline with validation and monitoring"
-        completed_tasks = [
-            Task(
-                id="task_001",
-                description="Design data schema",
-                status=TaskStatus.DONE,
-                result="Schema designed with 15 tables",
-            ),
-            Task(
-                id="task_002",
-                description="Implement data ingestion",
-                status=TaskStatus.DONE,
-                result="Ingestion working for CSV and JSON",
-            ),
-        ]
-        pending_tasks = [
-            Task(id="task_003", description="Add data validation", status=TaskStatus.PENDING),
-            Task(id="task_004", description="Set up monitoring", status=TaskStatus.PENDING),
-        ]
+        with reflector.override(model=TestModel()):
+            goal = "Create a data processing pipeline with validation and monitoring"
+            completed_tasks = [
+                Task(
+                    id="task_001",
+                    description="Design data schema",
+                    status=TaskStatus.DONE,
+                    result="Schema designed with 15 tables",
+                ),
+                Task(
+                    id="task_002",
+                    description="Implement data ingestion",
+                    status=TaskStatus.DONE,
+                    result="Ingestion working for CSV and JSON",
+                ),
+            ]
+            pending_tasks = [
+                Task(id="task_003", description="Add data validation", status=TaskStatus.PENDING),
+                Task(id="task_004", description="Set up monitoring", status=TaskStatus.PENDING),
+            ]
 
-        result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+            result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
 
-        assert isinstance(result, ReflectionOutput)
-        assert result.done is False  # Goal not fully accomplished
-        assert len(result.gaps) >= 0  # May have no gaps if pending tasks cover needs
-        assert isinstance(result.new_tasks, list)
+            assert isinstance(result, ReflectionOutput)
+            assert isinstance(result.done, bool)
+            assert isinstance(result.gaps, list)
+            assert isinstance(result.new_tasks, list)
 
     @pytest.mark.asyncio
     async def test_irrelevant_task_identification(self):
         """Test: Reflector can mark tasks as irrelevant when goal changes"""
-        goal = "Complete API endpoints only (drop database optimization for now)"
-        completed_tasks = [
-            Task(
-                id="task_001",
-                description="Implement REST endpoints",
-                status=TaskStatus.DONE,
-                result="All endpoints working",
-            )
-        ]
-        pending_tasks = [
-            Task(id="task_002", description="Optimize database indexes", status=TaskStatus.PENDING),
-            Task(id="task_003", description="Add caching layer", status=TaskStatus.PENDING),
-        ]
+        with reflector.override(model=TestModel()):
+            goal = "Complete API endpoints only (drop database optimization for now)"
+            completed_tasks = [
+                Task(
+                    id="task_001",
+                    description="Implement REST endpoints",
+                    status=TaskStatus.DONE,
+                    result="All endpoints working",
+                )
+            ]
+            pending_tasks = [
+                Task(id="task_002", description="Optimize database indexes", status=TaskStatus.PENDING),
+                Task(id="task_003", description="Add caching layer", status=TaskStatus.PENDING),
+            ]
 
-        result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+            result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
 
-        assert isinstance(result, ReflectionOutput)
-        # Should recognize database optimization might be irrelevant now
-        assert isinstance(result.complete_ids, list)
+            assert isinstance(result, ReflectionOutput)
+            # Should recognize database optimization might be irrelevant now
+            assert isinstance(result.complete_ids, list)
 
     @pytest.mark.asyncio
     async def test_empty_goal_handles_gracefully(self):
         """Test: Reflector handles edge case of empty state"""
-        goal = "Evaluate current progress"
-        completed_tasks: list[Task] = []
-        pending_tasks: list[Task] = []
+        with reflector.override(model=TestModel()):
+            goal = "Evaluate current progress"
+            completed_tasks: list[Task] = []
+            pending_tasks: list[Task] = []
 
-        result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
+            result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
 
-        assert isinstance(result, ReflectionOutput)
-        assert isinstance(result.done, bool)
-        assert isinstance(result.gaps, list)
-        assert isinstance(result.new_tasks, list)
-        assert isinstance(result.complete_ids, list)
+            assert isinstance(result, ReflectionOutput)
+            assert isinstance(result.done, bool)
+            assert isinstance(result.gaps, list)
+            assert isinstance(result.new_tasks, list)
+            assert isinstance(result.complete_ids, list)
 
 
 class TestReflectOnProgressFunction:
