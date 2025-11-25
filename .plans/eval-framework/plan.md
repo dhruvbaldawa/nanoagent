@@ -1,145 +1,163 @@
 # Eval Framework Feature Plan
 
 ## Overview
-Implement hybrid testing: fast mocked unit tests (default) + opt-in eval scripts for real LLM validation.
+Two-tier testing strategy: fast unit tests (Tier 1) + quality evaluation for prompt/model iteration (Tier 2).
 
-**Problem**: Current tests using `ALLOW_MODEL_REQUESTS=true` are slow (5+ min) and flaky. Need to:
-- Make default `uv run pytest` fast and reliable (<1s, 100% pass)
-- Validate real LLM behavior via separate, optional eval scripts
+**Problem**: Current tests using `ALLOW_MODEL_REQUESTS=true` are slow (5+ min) and flaky. Additionally, there's no systematic way to iterate on prompts/models and measure quality improvements.
 
-**Solution**: Separate deterministic unit tests (mocked) from stochastic eval scripts (real models), following industry best practices.
+**Solution**:
+- **Tier 1 (Now)**: Use Pydantic AI's built-in `TestModel` + `Agent.override()` for fast, deterministic unit tests
+- **Tier 2 (Deferred)**: Use DeepEval for quality evaluation and prompt/model iteration
 
 ---
 
 ## Success Criteria
-- [ ] Default `uv run pytest` runs in <1s, 100% passing, zero flakiness
-- [ ] All 24 currently-skipped/failing tests converted to mocked tests
-- [ ] Eval scripts created for validating real LLM behavior (opt-in)
-- [ ] Behavioral assertions: validates LLM achieves goals, not exact outputs
-- [ ] Implementation <200 LOC (minimal overhead)
+
+### Tier 1 (Now)
+- [ ] All 24 tests converted to use TestModel + Agent.override()
+- [ ] `pytest nanoagent/` runs in <1s, 100% passing
+- [ ] No new dependencies added
+- [ ] Total LOC change: ~50 LOC
+
+### Tier 2 (Deferred)
+- [ ] DeepEval added as dependency
+- [ ] Eval tests created for TaskPlanner, Executor, Reflector
+- [ ] G-Eval metrics for subjective quality assessment
+- [ ] Evals run with `ALLOW_MODEL_REQUESTS=true pytest nanoagent/evals/ -m eval`
 
 ---
 
 ## Research Findings
 
-### Official Library Investigation
-✅ **`pydantic-evals` exists** - separate official package for Pydantic AI evaluations
+### Key Finding: Separate Concerns for Unit Tests vs Quality Evaluation
 
-**Key Capabilities** (from official docs):
-- `Case` - Define test cases with inputs, expected_output, metadata
-- `Dataset` - Manage test case collections with evaluators
-- **Built-in Evaluators**:
-  - `EqualsExpected()` - Exact output match
-  - `IsInstance()` - Type validation
-  - `Contains()` - String content validation
-  - `MaxDuration()` - Performance/timing checks
-  - `LLMJudge()` - Custom LLM-based evaluation with rubrics
-  - Custom evaluators supported via `Evaluator` base class
-- Single API for both unit test mocking and real eval validation
+Research from 3 exploration agents revealed that **unit testing** and **quality evaluation** are distinct concerns requiring different tools:
 
-**Perfect for our use case**:
-- Deterministic checks (IsInstance, Contains) for unit tests (fast, no API)
-- Can swap in real LLM-as-judge when using real models (slow, costly)
-- Exact same dataset/case structure for both test types
+1. **Unit Testing** → Pydantic AI's built-in `TestModel` + `Agent.override()`
+2. **Quality Evaluation** → DeepEval (or pydantic-evals)
 
-### Available Options
-1. **`pydantic-evals` package** ✅ (RECOMMENDED)
-   - Official Pydantic product
-   - Zero external dependencies beyond existing stack
-   - Built-in evaluators + LLMJudge for both mocking and real validation
-   - Elegant API: same code for unit tests (mocked) and eval scripts (real)
-   - Effort: 2-3 hours
+### Tier 1: Unit Testing (TestModel)
 
-2. **Braintrust + AutoEvals**
-   - Richer platform features but adds platform dependency
-   - Overkill for current needs
-   - Can integrate later if needed
+**Key Findings:**
+1. Pydantic AI already has `TestModel` and `Agent.override()` for fast unit tests
+2. This pattern is **already in use** in `task_planner_test.py` (lines 163-178)
+3. No new dependencies required
+4. LOC overhead: ~50 LOC total
 
-3. **Custom pytest fixtures + unittest.mock**
-   - More code to maintain
-   - No LLMJudge integration
+**Pattern:**
+```python
+from pydantic_ai.models.test import TestModel
 
-### Recommendation
-**`pydantic-evals` package** for this feature:
-- Official, maintained by Pydantic team
-- Designed for exactly this hybrid testing pattern
-- Minimal setup, maximum flexibility
-- Clean API across mock and real LLM scenarios
+async def test_executor_calls_tool(self):
+    with executor.override(model=TestModel()):
+        result = await execute_task("test task")
+        assert isinstance(result, ExecutionResult)
+```
+
+### Tier 2: Quality Evaluation (Framework Comparison)
+
+| Framework | Verdict | Reason |
+|-----------|---------|--------|
+| **DeepEval** | ✅ Recommended | Research-backed G-Eval metrics, pytest-style, @observe decorators, excellent Pydantic AI integration |
+| **pydantic-evals** | ⚠️ Alternative | Native Pydantic AI ecosystem, LLMJudge, Logfire integration |
+| **DSPy** | ❌ Overkill | Auto-optimization needs 50+ examples; manual iteration sufficient for <500 LOC framework |
+| **Ragas** | ❌ RAG-focused | Excellent for retrieval, but not agent-focused |
+| **Braintrust** | ❌ Enterprise | Platform-heavy, overkill for current needs |
+
+### Why DeepEval for Tier 2?
+
+1. **Research-backed metrics** - G-Eval framework with two-phase evaluation (reasoning steps → scoring)
+2. **Excellent Pydantic AI integration** - @observe decorators work seamlessly with agents
+3. **Component-level evaluation** - Matches TaskPlanner→Executor→Reflector architecture
+4. **pytest-compatible** - Native CI/CD integration
+5. **Agent-specific metrics** - Task completion, tool correctness built-in
+6. **Low setup friction** - Minimal code changes
+
+### pydantic-evals Capabilities (for reference)
+
+- **LLMJudge**: Evaluate subjective quality (is the plan sensible? is the reflection useful?)
+- **Deterministic evaluators**: EqualsExpected, IsInstance, Contains, MaxDuration
+- **Custom evaluators**: Domain-specific logic via Evaluator base class
+- **Span-based evaluation**: Verify internal agent behavior (tool calls, execution flow)
+- **Logfire integration**: Native observability
 
 ---
 
 ## Architecture Decision
 
-### Test Structure (Using `pydantic-evals`)
+### Two-Tier Test Structure
 ```
 nanoagent/
 ├── core/
-│   ├── executor_test.py            # Unit tests (fast, mocked, deterministic, CI gate)
-│   ├── executor_eval_test.py       # Eval tests with @pytest.mark.eval
+│   ├── executor_test.py            # Tier 1: Unit tests (TestModel, fast, CI gate)
 │   ├── reflector_test.py
-│   ├── reflector_eval_test.py
 │   ├── task_planner_test.py
-│   ├── task_planner_eval_test.py
 │   └── ...
-└── evals/
+└── evals/                          # Tier 2: Quality evaluation (DeepEval, deferred)
     ├── __init__.py
-    ├── conftest.py                 # Pytest fixtures + eval marker config
-    └── datasets/                   # Shared test case definitions
-        ├── executor_cases.py
-        ├── reflector_cases.py
-        ├── task_planner_cases.py
-        └── e2e_cases.py
+    ├── conftest.py
+    └── ...
 ```
 
-**Dual-mode operation**:
+**Run patterns**:
 ```bash
-# Default: Run only unit tests (fast, CI-friendly)
-pytest nanoagent/                          # 202 tests, <1s, deterministic
+# Tier 1: Fast unit tests (default, CI-friendly)
+pytest nanoagent/                          # <1s, 100% passing, deterministic
 
-# Run evals as pytest suite (with real models)
-ALLOW_MODEL_REQUESTS=true pytest -m eval   # 4 eval suites, ~60s, flexible assertions
-
-# Or run specific eval test
-ALLOW_MODEL_REQUESTS=true pytest nanoagent/core/executor_eval_test.py -v
-
-# Skip all evals (useful for CI)
-pytest nanoagent/ -m "not eval"
+# Tier 2: Quality evals (deferred - future implementation with DeepEval)
+ALLOW_MODEL_REQUESTS=true pytest nanoagent/evals/ -m eval
 ```
 
-### Testing Philosophy (Using `pydantic-evals`)
-- **Unit Tests** (deterministic evaluators):
-  ```python
-  # Same Case/Dataset structure for both!
-  dataset = Dataset(
-    cases=[Case(inputs='...', expected_output=TaskPlanOutput(...))],
-    evaluators=[
-      IsInstance(type_name='TaskPlanOutput'),  # Schema validation
-      Contains(value='task'),  # Content check
-    ]
-  )
-  report = dataset.evaluate_sync(planner.plan)  # Mock or real
-  ```
-  - Validate agent outputs match schema
-  - Validate deterministic logic (orchestration, context passing)
-  - Use `IsInstance()`, `Contains()`, `MaxDuration()` (fast, free, no LLM calls)
-  - Run on every commit, block deployment on failure
+### Tier 1: Unit Testing Philosophy (TestModel)
 
-- **Eval Scripts** (with LLMJudge):
-  ```python
-  # Same dataset definition, add LLMJudge evaluator!
-  dataset = Dataset(
-    cases=[...],  # Same cases as unit tests
-    evaluators=[
-      IsInstance(...),  # Keep deterministic checks
-      LLMJudge(rubric='Plan includes reasonable task breakdown'),  # Real LLM
-    ]
-  )
-  ```
-  - Validate real LLM behavior across scenarios
-  - Assert goal achievement (task count reasonable, completion detection works)
-  - Use `LLMJudge()` for subjective dimensions (requires API calls)
-  - Run manually with `ALLOW_MODEL_REQUESTS=true python nanoagent/evals/scripts/eval_*.py`
-  - Inform development; don't block CI
+```python
+from pydantic_ai.models.test import TestModel
+
+async def test_executor_structured_output(self):
+    # Fast, deterministic, no API calls
+    with executor.override(model=TestModel()):
+        result = await execute_task("test task")
+        assert isinstance(result, ExecutionResult)
+        assert result.status in ["success", "error"]
+```
+
+- Validate agent outputs match schema
+- Validate deterministic logic (orchestration, context passing)
+- Run on every commit, block deployment on failure
+- No external dependencies beyond pydantic-ai
+
+### Tier 2: Quality Evaluation Philosophy (DeepEval - Deferred)
+
+```python
+from deepeval import evaluate
+from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCase
+
+@pytest.mark.eval
+async def test_task_planner_quality():
+    result = await task_planner.run("Build a REST API")
+
+    test_case = LLMTestCase(
+        input="Build a REST API",
+        actual_output=result.model_dump_json(),
+    )
+
+    metric = GEval(
+        name="plan_quality",
+        criteria="Is the task decomposition logical and complete?",
+        evaluation_steps=[
+            "Check if all major components are identified",
+            "Verify tasks are actionable and independent",
+        ]
+    )
+
+    assert metric.measure(test_case).score > 0.7
+```
+
+- Validate subjective quality dimensions
+- Use research-backed G-Eval metrics
+- Component-level tracing with @observe decorators
+- Run manually for prompt/model iteration
 
 ---
 
@@ -164,111 +182,109 @@ pytest nanoagent/ -m "not eval"
 
 ## Iteration Plan
 
-### Iteration 1: Setup & Unit Test Integration (Foundation)
-**Goal**: Add `pydantic-evals` package and convert tests to use Dataset/Case/Evaluators
+### Iteration 1: Tier 1 - Fast Unit Tests with TestModel (NOW)
+**Goal**: Convert all 24 tests to use TestModel + Agent.override() for fast, deterministic execution
 
-Tasks:
-1. Add `pydantic-evals` to uv.lock: `uv add pydantic-evals`
-2. Create `nanoagent/evals/conftest.py` - Mock agent fixtures for tests
-3. Create `nanoagent/evals/datasets/executor_cases.py` - ExecutionResult test cases
-4. Convert executor_test.py to use Dataset + IsInstance/Contains evaluators
-5. Create reflector/task_planner/e2e test cases similarly
-6. Update all 24 tests to use pydantic-evals (swap real agents for mocks)
-7. Verify all tests pass in <1s
+**Tasks**:
+1. Convert `executor_test.py` - 4 tests
+2. Convert `reflector_test.py` - 7 tests
+3. Convert `task_planner_test.py` - 5 tests
+4. Convert `e2e_test.py` - 6 tests
+5. Convert `orchestration_test.py` - 2 tests
+6. Remove `require_real_api_key` fixture from unit tests
+7. Verify `pytest nanoagent/` runs in <1s
 
 **Implementation Pattern**:
 ```python
-# executor_test.py
-from pydantic_evals import Case, Dataset
-from pydantic_evals.evaluators import IsInstance, Contains
-from nanoagent.evals.datasets.executor_cases import executor_cases
+from pydantic_ai.models.test import TestModel
 
-@pytest.mark.parametrize('case', executor_cases)
-def test_executor_with_case(case):
-    dataset = Dataset(
-        cases=[case],
-        evaluators=[
-            IsInstance(type_name='ExecutionResult'),
-            Contains(value='success') if case.metadata.get('expects_success') else Contains(value='error'),
-        ]
-    )
-    report = dataset.evaluate_sync(mock_executor.execute_task)
-    assert report.pass_rate == 1.0
+class TestExecutor:
+    @pytest.mark.asyncio
+    async def test_executor_structured_output(self):
+        # Before: Real API call (slow, flaky)
+        # @pytest.mark.usefixtures("require_real_api_key")
+        # result = await execute_task("Search for Python info")
+
+        # After: TestModel (fast, deterministic)
+        with executor.override(model=TestModel()):
+            result = await execute_task("Search for Python info")
+            assert isinstance(result, ExecutionResult)
 ```
 
-**Outcome**: `uv run pytest` runs full suite in <1s, 100% passing, zero flakiness
+**Success Criteria**:
+- [ ] All 24 tests converted to use TestModel
+- [ ] `pytest nanoagent/` runs in <1s, 100% passing
+- [ ] No new dependencies added
+- [ ] Total LOC change: ~50 LOC
 
-### Iteration 2: Eval Tests with LLMJudge (Integration)
-**Goal**: Create pytest-compatible eval suite using same test cases + real LLM validation
+**Outcome**: Fast, reliable unit tests for CI/CD
 
-Tasks:
-1. Create `nanoagent/evals/conftest.py` - Setup `@pytest.mark.eval` marker, LLM fixtures
-2. Create `nanoagent/evals/datasets/*.py` - Shared test case definitions
-3. Create `nanoagent/core/executor_eval_test.py` - Use LLMJudge for execution quality
-4. Create `nanoagent/core/reflector_eval_test.py` - Validate completion detection
-5. Create `nanoagent/core/task_planner_eval_test.py` - Use LLMJudge for plan quality
-6. Create `nanoagent/tests/integration/e2e_eval_test.py` - Validate orchestration quality
+---
 
-**Implementation Pattern**:
+### Iteration 2: Tier 2 - Quality Evaluation with DeepEval (DEFERRED)
+**Goal**: Create quality evaluation suite for prompt/model iteration
+
+**Tasks** (when implemented):
+1. `uv add deepeval`
+2. Create `nanoagent/evals/` directory structure
+3. Create eval tests with G-Eval metrics for each agent
+4. Add @observe decorators for component-level tracing
+5. Document eval usage patterns
+
+**Implementation Pattern** (DeepEval):
 ```python
-# nanoagent/core/task_planner_eval_test.py
-import pytest
-from pydantic_evals import Dataset
-from pydantic_evals.evaluators import IsInstance, LLMJudge
-from nanoagent.evals.datasets.task_planner_cases import task_planner_cases
-from nanoagent.core.task_planner import plan_tasks
+from deepeval import evaluate
+from deepeval.metrics import GEval
+from deepeval.test_case import LLMTestCase
 
-@pytest.mark.eval  # Mark as eval test (skip by default, run with -m eval)
+@pytest.mark.eval
 @pytest.mark.asyncio
-async def test_task_planner_with_lljudge():
-    """Validate task planner with real LLM evaluation."""
-    dataset = Dataset(
-        cases=task_planner_cases,
-        evaluators=[
-            IsInstance(type_name='TaskPlanOutput'),  # Fast check first
-            LLMJudge(
-                rubric='Plan breaks goal into 5-15 reasonable tasks; tasks are independent and actionable',
-                include_input=True,
-            ),  # Slow but flexible LLM check
+async def test_task_planner_quality():
+    result = await task_planner.run("Build a REST API with authentication")
+
+    test_case = LLMTestCase(
+        input="Build a REST API with authentication",
+        actual_output=result.model_dump_json(),
+    )
+
+    metric = GEval(
+        name="plan_quality",
+        criteria="Is the task decomposition logical, complete, and actionable?",
+        evaluation_steps=[
+            "Check if all major components are identified",
+            "Verify tasks are independent and parallelizable",
+            "Confirm each task is specific enough to execute",
         ]
     )
 
-    report = dataset.evaluate_sync(plan_tasks)
-
-    # Assert both deterministic (100%) and LLM-based (>70%) pass rates
-    assert report.pass_rate >= 0.7, f"LLM eval pass rate {report.pass_rate} below 70%"
-    # Print detailed report for investigation
-    report.print(include_input=True, include_output=True)
+    result = metric.measure(test_case)
+    assert result.score > 0.7, f"Plan quality score {result.score} below threshold"
 ```
 
 **Run evals**:
 ```bash
-# Run with real LLM evaluation
-ALLOW_MODEL_REQUESTS=true pytest nanoagent/evals -m eval -v
-
-# Or specific eval only
-ALLOW_MODEL_REQUESTS=true pytest nanoagent/evals/test_task_planner_eval.py -v
-
-# Skip evals (default for CI)
-pytest nanoagent/ -m "not eval"
+# Run quality evals with real models
+ALLOW_MODEL_REQUESTS=true pytest nanoagent/evals/ -m eval -v
 ```
 
-**Outcome**: Pytest-compatible eval suite; can run standalone or as part of test suite
-
-### Iteration 3: Documentation (Polish)
-**Goal**: Clear usage patterns for hybrid testing
-
-Tasks:
-1. Add eval section to README with examples
-2. Document when to use unit tests (CI, fast, deterministic) vs evals (manual, flexible)
-3. Create example eval results and how to interpret them
-4. Document custom evaluator pattern for specialized checks
-
-**Outcome**: Teams understand and can extend hybrid testing approach
+**Outcome**: Systematic quality measurement for prompt/model iteration
 
 ---
 
-## How pydantic-evals Works (Reference for Future)
+### Iteration 3: Documentation (DEFERRED)
+**Goal**: Clear usage patterns for two-tier testing
+
+**Tasks**:
+1. Document Tier 1 (TestModel) usage patterns
+2. Document Tier 2 (DeepEval) usage patterns
+3. Explain when to use each tier
+4. Provide examples for custom evaluators
+
+**Outcome**: Teams understand and can extend two-tier testing approach
+
+---
+
+## Reference: pydantic-evals API (Alternative to DeepEval)
 
 ### Core Components
 
@@ -438,46 +454,44 @@ dataset = Dataset(
 
 ## Deferred Items
 
-- **LLM-as-judge scoring**: Defer to when eval scripts prove the need
+- **Tier 2 (DeepEval)**: Quality evaluation for prompt/model iteration
+- **LLM-as-judge scoring**: Defer to Tier 2 implementation
 - **Eval dashboards/tracking**: Defer to separate monitoring feature
 - **Cost optimization/sampling**: Defer to when at production scale
-- **Braintrust integration**: Defer to if/when platform monitoring needed
 - **Continuous eval monitoring**: Defer to ops/monitoring phase
 
 ---
 
 ## Next Steps
 
-1. **Confirm approach**: Is pytest fixtures + unittest.mock acceptable?
-2. **Create tasks**: Generate pending/*.md files for each iteration
-3. **Implement**: Follow TDD for each test conversion
+1. **Implement Tier 1**: Convert all 24 tests to use TestModel + Agent.override()
+2. **Verify**: Ensure `pytest nanoagent/` runs in <1s, 100% passing
+3. **Later**: Implement Tier 2 with DeepEval when quality evaluation is needed
 
 ---
 
 ## File Changes Summary
 
+### Tier 1 (Now) - ~50 LOC total
+
 **Modified**:
-- nanoagent/core/executor_test.py (~20 LOC added for pydantic-evals integration)
-- nanoagent/core/reflector_test.py (~25 LOC added for pydantic-evals integration)
-- nanoagent/core/task_planner_test.py (~20 LOC added for pydantic-evals integration)
-- nanoagent/tests/integration/e2e_test.py (~15 LOC added for pydantic-evals integration)
+- `nanoagent/core/executor_test.py` - Add TestModel override to 4 tests (~10 LOC)
+- `nanoagent/core/reflector_test.py` - Add TestModel override to 7 tests (~15 LOC)
+- `nanoagent/core/task_planner_test.py` - Add TestModel override to 5 tests (~10 LOC)
+- `nanoagent/tests/integration/e2e_test.py` - Add TestModel override to 6 tests (~10 LOC)
+- `nanoagent/tests/integration/orchestration_test.py` - Add TestModel override to 2 tests (~5 LOC)
 
-**Created - Eval Framework**:
-- nanoagent/evals/__init__.py (~5 LOC)
-- nanoagent/evals/conftest.py (~20 LOC) - Setup eval marker, fixtures
-- nanoagent/evals/datasets/executor_cases.py (~30 LOC)
-- nanoagent/evals/datasets/reflector_cases.py (~30 LOC)
-- nanoagent/evals/datasets/task_planner_cases.py (~30 LOC)
-- nanoagent/evals/datasets/e2e_cases.py (~30 LOC)
+**No new files or dependencies required**
 
-**Created - Eval Tests**:
-- nanoagent/core/executor_eval_test.py (~35 LOC)
-- nanoagent/core/reflector_eval_test.py (~35 LOC)
-- nanoagent/core/task_planner_eval_test.py (~35 LOC)
-- nanoagent/tests/integration/e2e_eval_test.py (~35 LOC)
+### Tier 2 (Deferred) - ~200 LOC when implemented
 
-**Total LOC Impact**: ~385 LOC
-- Unit test modifications: 80 LOC
-- Eval framework (conftest + datasets): 145 LOC
-- Eval tests: 140 LOC
-- Plus pydantic-evals dependency (new package)
+**Will Create**:
+- `nanoagent/evals/__init__.py`
+- `nanoagent/evals/conftest.py` - Setup eval marker, fixtures
+- `nanoagent/evals/task_planner_eval_test.py`
+- `nanoagent/evals/executor_eval_test.py`
+- `nanoagent/evals/reflector_eval_test.py`
+- `nanoagent/evals/e2e_eval_test.py`
+
+**Will Add**:
+- `deepeval` dependency (when Tier 2 is implemented)

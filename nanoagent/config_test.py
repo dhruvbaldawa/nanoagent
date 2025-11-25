@@ -137,9 +137,9 @@ class TestTestingSettings:
         monkeypatch.delenv("REFLECTOR_MODEL", raising=False)
 
         settings = TestingSettings()  # Should not raise
-        assert settings.task_planner_model == "anthropic:claude-sonnet-4-5-20250514"
-        assert settings.executor_model == "anthropic:claude-sonnet-4-5-20250514"
-        assert settings.reflector_model == "anthropic:claude-sonnet-4-5-20250514"
+        assert settings.task_planner_model == "openrouter:minimax/minimax-m2"
+        assert settings.executor_model == "openrouter:minimax/minimax-m2"
+        assert settings.reflector_model == "openrouter:minimax/minimax-m2"
 
     def test_env_overrides_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Env vars can override TestingSettings defaults."""
@@ -150,8 +150,8 @@ class TestTestingSettings:
         settings = TestingSettings()
         assert settings.task_planner_model == "openai:gpt-4o-mini"
         # Others still use defaults
-        assert settings.executor_model == "anthropic:claude-sonnet-4-5-20250514"
-        assert settings.reflector_model == "anthropic:claude-sonnet-4-5-20250514"
+        assert settings.executor_model == "openrouter:minimax/minimax-m2"
+        assert settings.reflector_model == "openrouter:minimax/minimax-m2"
 
     def test_partial_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Can override specific agents while others keep defaults."""
@@ -160,9 +160,9 @@ class TestTestingSettings:
         monkeypatch.delenv("REFLECTOR_MODEL", raising=False)
 
         settings = TestingSettings()
-        assert settings.task_planner_model == "anthropic:claude-sonnet-4-5-20250514"  # Default
+        assert settings.task_planner_model == "openrouter:minimax/minimax-m2"  # Default
         assert settings.executor_model == "openai:gpt-4o"  # Override
-        assert settings.reflector_model == "anthropic:claude-sonnet-4-5-20250514"  # Default
+        assert settings.reflector_model == "openrouter:minimax/minimax-m2"  # Default
 
     def test_api_keys_optional(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """TestingSettings works without API keys."""

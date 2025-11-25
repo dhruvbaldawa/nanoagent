@@ -21,7 +21,7 @@ class TestReflector:
         goal = "Calculate 2 + 2"
         completed_tasks: list[Task] = [
             Task(
-                id="task001",
+                id="task_001",
                 description="Calculate 2 + 2",
                 status=TaskStatus.DONE,
                 result="Result: 4",
@@ -43,14 +43,14 @@ class TestReflector:
         goal = "Build a REST API with authentication and database"
         completed_tasks: list[Task] = [
             Task(
-                id="task001",
+                id="task_001",
                 description="Create basic API endpoints",
                 status=TaskStatus.DONE,
                 result="Basic endpoints created: GET /users, POST /users",
             )
         ]
         pending_tasks: list[Task] = [
-            Task(id="task002", description="Implement user authentication", status=TaskStatus.PENDING),
+            Task(id="task_002", description="Implement user authentication", status=TaskStatus.PENDING),
         ]
 
         result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
@@ -68,15 +68,15 @@ class TestReflector:
         goal = "Set up project infrastructure"
         completed_tasks: list[Task] = [
             Task(
-                id="task001",
+                id="task_001",
                 description="Initialize git repository",
                 status=TaskStatus.DONE,
                 result="Git repo initialized",
             )
         ]
         pending_tasks: list[Task] = [
-            Task(id="task002", description="Set up CI/CD pipeline", status=TaskStatus.PENDING),
-            Task(id="task003", description="Configure Docker", status=TaskStatus.PENDING),
+            Task(id="task_002", description="Set up CI/CD pipeline", status=TaskStatus.PENDING),
+            Task(id="task_003", description="Configure Docker", status=TaskStatus.PENDING),
         ]
 
         result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
@@ -115,21 +115,21 @@ class TestReflector:
         goal = "Create a data processing pipeline with validation and monitoring"
         completed_tasks = [
             Task(
-                id="task001",
+                id="task_001",
                 description="Design data schema",
                 status=TaskStatus.DONE,
                 result="Schema designed with 15 tables",
             ),
             Task(
-                id="task002",
+                id="task_002",
                 description="Implement data ingestion",
                 status=TaskStatus.DONE,
                 result="Ingestion working for CSV and JSON",
             ),
         ]
         pending_tasks = [
-            Task(id="task003", description="Add data validation", status=TaskStatus.PENDING),
-            Task(id="task004", description="Set up monitoring", status=TaskStatus.PENDING),
+            Task(id="task_003", description="Add data validation", status=TaskStatus.PENDING),
+            Task(id="task_004", description="Set up monitoring", status=TaskStatus.PENDING),
         ]
 
         result = await reflect_on_progress(goal, completed_tasks, pending_tasks)
@@ -145,15 +145,15 @@ class TestReflector:
         goal = "Complete API endpoints only (drop database optimization for now)"
         completed_tasks = [
             Task(
-                id="task001",
+                id="task_001",
                 description="Implement REST endpoints",
                 status=TaskStatus.DONE,
                 result="All endpoints working",
             )
         ]
         pending_tasks = [
-            Task(id="task002", description="Optimize database indexes", status=TaskStatus.PENDING),
-            Task(id="task003", description="Add caching layer", status=TaskStatus.PENDING),
+            Task(id="task_002", description="Optimize database indexes", status=TaskStatus.PENDING),
+            Task(id="task_003", description="Add caching layer", status=TaskStatus.PENDING),
         ]
 
         result = await reflect_on_progress(goal, completed_tasks, pending_tasks)

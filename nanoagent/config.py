@@ -62,9 +62,9 @@ class ProductionSettings(Settings):
 class TestingSettings(Settings):
     """Test settings - provides sensible defaults for test environments."""
 
-    task_planner_model: str = "anthropic:claude-sonnet-4-5-20250514"
-    executor_model: str = "anthropic:claude-sonnet-4-5-20250514"
-    reflector_model: str = "anthropic:claude-sonnet-4-5-20250514"
+    task_planner_model: str = "openrouter:minimax/minimax-m2"
+    executor_model: str = "openrouter:minimax/minimax-m2"
+    reflector_model: str = "openrouter:minimax/minimax-m2"
 
     model_config = SettingsConfigDict(env_file=None, env_prefix="")
 
