@@ -1,6 +1,6 @@
 # Lightweight Generic Agent Framework Architecture
 
-**Version:** 1.0  
+**Version:** 1.0
 **Philosophy:** Frugal, pragmatic, production-ready
 
 ---
@@ -199,13 +199,13 @@ reflector = Agent(
 class ToolRegistry:
     def __init__(self):
         self.tools: Dict[str, Callable] = {}
-    
+
     def register(self, name: str, func: Callable):
         self.tools[name] = func
-    
+
     def get(self, name: str) -> Callable:
         return self.tools[name]
-    
+
     def list_names() -> List[str]:
         return list(self.tools.keys())
 ```
@@ -374,35 +374,35 @@ Orchestrator.__init__():
           f"Result: {result}"
           for id, result in context.items()
       ])
-      
+
       reflection = Reflector.run(
           goal=goal,
           done_tasks=context_str,
           pending_tasks=[t.description for t in todo.get_pending()]
       )
-      
+
       stream.emit("reflection", reflection)
-      
+
       # Update TodoManager
       for tid in reflection.complete_ids:
           todo.tasks[tid].status = "done"
-      
+
       todo.add_tasks(reflection.new_tasks, priority=7)
-      
+
       IF reflection.done:
           BREAK LOOP
 
 8. iteration += 1
    IF iteration >= max_iterations:
        BREAK LOOP
-   
+
    GOTO Step 4
 ```
 
 ### Finalization
 ```
 9. final_output = synthesize_all_results(context)
-   
+
 10. Return AgentRunResult(
        output=final_output,
        status="completed" if reflection.done else "incomplete"
