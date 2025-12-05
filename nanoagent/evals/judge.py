@@ -105,16 +105,6 @@ Provide your evaluation as a structured score."""
             "pass_threshold": pass_threshold,
         })
 
-        logger.info(
-            "Evaluation completed",
-            extra={
-                "dimension": dimension.value,
-                "score": output.score,
-                "passed": output.score >= pass_threshold,
-            },
-        )
-        return output
-
     except ModelHTTPError as e:
         logger.error(
             "LLM API error during evaluation",
@@ -163,3 +153,14 @@ Provide your evaluation as a structured score."""
             exc_info=True,
         )
         raise
+
+    else:
+        logger.info(
+            "Evaluation completed",
+            extra={
+                "dimension": dimension.value,
+                "score": output.score,
+                "passed": output.score >= pass_threshold,
+            },
+        )
+        return output

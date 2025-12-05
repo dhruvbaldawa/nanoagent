@@ -10,6 +10,7 @@
 A minimal multi-agent framework for autonomous task execution inspired by Enterprise Deep Research (EDR), built with Pydantic AI. Designed for solo engineers who need sophisticated agent capabilities without framework bloat.
 
 **Key Features:**
+
 - 🎯 Generic task decomposition and execution
 - 🔧 Pluggable tool system
 - 🔄 Reflection-based iterative refinement
@@ -31,6 +32,7 @@ A minimal multi-agent framework for autonomous task execution inspired by Enterp
 ## Data Models
 
 ### Task
+
 ```python
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
@@ -40,6 +42,7 @@ class Task(BaseModel):
 ```
 
 ### TaskPlanOutput
+
 ```python
 class TaskPlanOutput(BaseModel):
     """What TaskPlanner returns"""
@@ -48,6 +51,7 @@ class TaskPlanOutput(BaseModel):
 ```
 
 ### ExecutionResult
+
 ```python
 class ExecutionResult(BaseModel):
     """What Executor returns"""
@@ -56,6 +60,7 @@ class ExecutionResult(BaseModel):
 ```
 
 ### ReflectionOutput
+
 ```python
 class ReflectionOutput(BaseModel):
     """What Reflector returns"""
@@ -66,6 +71,7 @@ class ReflectionOutput(BaseModel):
 ```
 
 ### AgentRunResult
+
 ```python
 class AgentRunResult(BaseModel):
     """Final output to user"""
@@ -82,11 +88,13 @@ class AgentRunResult(BaseModel):
 **Role:** Decomposes high-level goals into actionable subtasks
 
 **Responsibilities:**
+
 - Initial goal decomposition (3-7 tasks)
 - Ask clarifying questions when ambiguous
 - Generate new tasks based on reflection feedback
 
 **Configuration:**
+
 ```python
 task_planner = Agent(
     model='anthropic:claude-sonnet-4-0',
@@ -107,6 +115,7 @@ task_planner = Agent(
 **Role:** Centralized task queue and state management
 
 **State:**
+
 ```python
 class TodoManager:
     tasks: Dict[str, Task]  # id -> Task
@@ -114,6 +123,7 @@ class TodoManager:
 ```
 
 **Key Methods:**
+
 ```python
 add_tasks(descriptions: List[str], priority: int = 5)
 get_next() -> Optional[Task]  # Highest priority pending
@@ -131,12 +141,14 @@ get_done() -> List[Task]
 **Role:** Execute individual tasks using available tools
 
 **Responsibilities:**
+
 - Receive one task at a time
 - Decide which tool(s) to use
 - Handle errors and retries
 - Return structured result
 
 **Configuration:**
+
 ```python
 executor = Agent(
     model='anthropic:claude-sonnet-4-0',
@@ -153,6 +165,7 @@ class ExecutorDeps:
 ```
 
 **Tool Integration:**
+
 ```python
 @executor.tool
 async def web_search(ctx: RunContext[ExecutorDeps], query: str) -> str:
@@ -166,6 +179,7 @@ async def web_search(ctx: RunContext[ExecutorDeps], query: str) -> str:
 **Role:** Evaluate progress and identify knowledge gaps
 
 **Inputs:**
+
 - Original goal
 - Completed tasks + results
 - Pending tasks
@@ -173,6 +187,7 @@ async def web_search(ctx: RunContext[ExecutorDeps], query: str) -> str:
 **Outputs:** `ReflectionOutput` (structured)
 
 **Configuration:**
+
 ```python
 reflector = Agent(
     model='anthropic:claude-sonnet-4-0',
@@ -195,6 +210,7 @@ reflector = Agent(
 **Role:** Pluggable tool management
 
 **Implementation:**
+
 ```python
 class ToolRegistry:
     def __init__(self):
@@ -211,6 +227,7 @@ class ToolRegistry:
 ```
 
 **Built-in Tools:**
+
 - `web_search(query: str) -> str`
 - `read_file(path: str) -> str`
 - `write_file(path: str, content: str) -> bool`
@@ -224,6 +241,7 @@ class ToolRegistry:
 **Role:** Real-time event broadcasting
 
 **Implementation:**
+
 ```python
 class StreamManager:
     def emit(self, event_type: str, data: Any):
@@ -236,6 +254,7 @@ class StreamManager:
 ```
 
 **Event Types:**
+
 - `task_started`
 - `tool_called`
 - `task_completed`
@@ -249,6 +268,7 @@ class StreamManager:
 **Role:** Coordinates all components in iterative loops
 
 **Core State:**
+
 ```python
 class Orchestrator:
     goal: str
@@ -329,6 +349,7 @@ class Orchestrator:
 ## Data Flow
 
 ### Initialization
+
 ```
 User provides: goal, tools, max_iterations
 
@@ -340,6 +361,7 @@ Orchestrator.__init__():
 ```
 
 ### Loop 0: Initial Planning
+
 ```
 1. plan = TaskPlanner.run(goal)
    → Returns: TaskPlanOutput(tasks=[...], questions=[...])
@@ -352,6 +374,7 @@ Orchestrator.__init__():
 ```
 
 ### Loop N: Execute + Reflect
+
 ```
 4. task = TodoManager.get_next()
    stream.emit("task_started", task)
@@ -400,6 +423,7 @@ Orchestrator.__init__():
 ```
 
 ### Finalization
+
 ```
 9. final_output = synthesize_all_results(context)
 
@@ -414,6 +438,7 @@ Orchestrator.__init__():
 ## Implementation Patterns
 
 ### Tool Registration
+
 ```python
 # Setup
 orchestrator = Orchestrator(goal="...", max_iterations=10)
@@ -430,6 +455,7 @@ def fetch_company_data(ticker: str) -> dict:
 ```
 
 ### Streaming with Pydantic AI
+
 ```python
 # Executor uses native streaming
 async with executor.run_stream(prompt, deps=deps) as response:
@@ -439,6 +465,7 @@ async with executor.run_stream(prompt, deps=deps) as response:
 ```
 
 ### Context as Simple Dict
+
 ```python
 # Store results simply
 context = {
@@ -458,6 +485,7 @@ context_str = "\n\n".join([
 ## Simplified Prompts
 
 ### TaskPlanner
+
 ```python
 PLANNER_PROMPT = """
 Goal: {goal}
@@ -476,6 +504,7 @@ Return JSON:
 ```
 
 ### Reflector
+
 ```python
 REFLECTOR_PROMPT = """
 Goal: {goal}
@@ -533,6 +562,7 @@ Total Core: ~500 LOC
 ## Key Design Decisions
 
 ### Why Pydantic AI over LiteLLM?
+
 - ✅ Native tool calling with type safety
 - ✅ Structured outputs (essential for task/reflection parsing)
 - ✅ Dependency injection (cleaner state passing)
@@ -540,24 +570,28 @@ Total Core: ~500 LOC
 - ✅ Model-agnostic like LiteLLM, better DX
 
 ### Why Separate Planner/Executor/Reflector?
+
 - Clear separation of concerns
 - Specialized prompts per role
 - Easy independent testing
 - Can use different models (fast for execution, smart for reflection)
 
 ### Why TodoManager as Plain Class?
+
 - Deterministic state management
 - No LLM uncertainty in task lifecycle
 - Easy to debug/inspect
 - Fast (no API calls)
 
 ### Why Minimal Data Models?
+
 - LLMs struggle with complex schemas
 - Less data = more reliable parsing
 - Faster serialization
 - Easier debugging
 
 ### Why In-Memory First?
+
 - Simplicity for MVP
 - Fast iteration during development
 - Easy to add persistence later (just serialize TodoManager)
@@ -569,6 +603,7 @@ Total Core: ~500 LOC
 ### Easy to Add Later
 
 **Persistence:**
+
 ```python
 # Add to TodoManager
 def save(self, path: str):
@@ -579,8 +614,9 @@ def load(self, path: str):
 ```
 
 **Human-in-the-Loop:**
+
 ```python
-# Use Pydantic AI's deferred_tools
+# Use Pydantic AI's deferred_toolsN
 @executor.tool(approval_required=True)
 def dangerous_operation(ctx, action: str):
     # Requires approval before executing
@@ -588,6 +624,7 @@ def dangerous_operation(ctx, action: str):
 ```
 
 **Multi-Agent Specialization:**
+
 ```python
 # Create specialized executors
 research_executor = Agent(..., instructions="Research specialist")
@@ -599,6 +636,7 @@ if "research" in task.description:
 ```
 
 **MCP Integration:**
+
 ```python
 # Pydantic AI supports MCP natively
 from pydantic_ai.mcp import MCPClient
@@ -639,21 +677,25 @@ print(result.status)
 ## Production Considerations
 
 **Error Handling:**
+
 - Wrap tool calls in try/except
 - Use Pydantic AI's `ModelRetry` for recoverable errors
 - Set max retries per tool
 
 **Rate Limiting:**
+
 - Add delays between API calls
 - Use async for parallelization where safe
 - Implement token budgets
 
 **Cost Control:**
+
 - Use cheaper models for Executor (fast, frequent calls)
 - Use smarter models for Reflector (infrequent, critical)
 - Track token usage in orchestrator
 
 **Testing:**
+
 - Mock ToolRegistry for unit tests
 - Test each agent independently
 - Integration tests with real tools
@@ -678,6 +720,7 @@ print(result.status)
 ## Summary
 
 This architecture gives you **80% of EDR's power with 10% of the complexity**. Perfect for:
+
 - Solo engineers building agent systems
 - Prototyping agentic workflows
 - Learning multi-agent patterns
@@ -688,6 +731,7 @@ This architecture gives you **80% of EDR's power with 10% of the complexity**. P
 ---
 
 **Next Steps:**
+
 1. Implement core components (~2-3 days)
 2. Add 3-5 essential tools
 3. Test with real use cases
