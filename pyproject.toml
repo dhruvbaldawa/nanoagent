@@ -48,9 +48,12 @@ executionEnvironments = [
 
 [tool.pytest.ini_options]
 testpaths = ["nanoagent"]
-python_files = ["*_test.py"]
+python_files = ["*_test.py", "*_eval.py"]
 asyncio_mode = "auto"
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not eval'"
+markers = [
+    "eval: quality evaluations using real LLM calls (slow, costs money)",
+]
 
 [tool.coverage.run]
 omit = [
