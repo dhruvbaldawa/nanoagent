@@ -100,11 +100,10 @@ Provide your evaluation as a structured score."""
     try:
         # Run evaluator and return result with dimension and threshold set
         result = await evaluator.run(full_prompt)  # type: ignore[arg-type]
-        output = result.output
-
-        # Ensure dimension and threshold match request
-        output.dimension = dimension
-        output.pass_threshold = pass_threshold
+        output = result.output.model_copy(update={
+            "dimension": dimension,
+            "pass_threshold": pass_threshold,
+        })
 
         logger.info(
             "Evaluation completed",
@@ -139,7 +138,7 @@ Provide your evaluation as a structured score."""
             },
             exc_info=True,
         )
-        raise ValueError(f"Evaluation failed: LLM output did not match EvalScore schema. {str(e)}") from e
+        raise ValueError(f"Evaluation failed: LLM output did not match EvalScore schema. {e!s}") from e
 
     except (httpx.TimeoutException, httpx.ConnectError) as e:
         logger.error(
