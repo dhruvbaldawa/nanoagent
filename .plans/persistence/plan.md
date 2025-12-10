@@ -53,53 +53,46 @@ class SQLiteStore(RunStore, TaskStore, ContextStore):
 
 ## Risk Analysis
 
-| Risk | Type | Classification | Mitigation |
-|------|------|----------------|------------|
-| Resume at exact loop position | Architecture | **Critical + Unknown** | Prototype in M1 |
-| SQLite concurrent access | Integration | **Critical + Unknown** | WAL mode, test in M1 |
-| Refactoring breaks existing tests | Architecture | Critical + Known | Incremental refactor, keep tests green |
-| Schema design | Architecture | Critical + Known | Standard DB patterns |
-| Performance (read every access) | Performance | Non-Critical | Defer; add caching if proven slow |
-| Schema migrations | Operations | Non-Critical | Defer; add versioning when schema changes |
+| Risk | Type | Classification | Status |
+|------|------|----------------|--------|
+| Resume at exact loop position | Architecture | Critical + Unknown | **RESOLVED** (M1 POC) |
+| SQLite concurrent access | Integration | Critical + Unknown | **RESOLVED** (WAL mode works) |
+| Refactoring breaks existing tests | Architecture | Critical + Known | Active (M2/M3) |
+| Schema design | Architecture | Critical + Known | **RESOLVED** |
+| Performance (read every access) | Performance | Non-Critical | Deferred |
+| Schema migrations | Operations | Non-Critical | Deferred |
+
+### M1 Learnings
+
+1. **Resume semantics**: Checkpoint before LLM execution. If crash between "task done" and "checkpoint", task re-executes on resume (acceptable idempotency).
+2. **Minimal state**: `run_id`, `phase`, `iteration`, `current_task_id` sufficient for resume.
+3. **Protocol design**: Composable protocols work well - components depend only on what they need.
 
 ## Milestones
 
-### Milestone 1: Prototype + Store Foundation
+### Milestone 1: Prototype + Store Foundation ✓ COMPLETE
 
 **Goal:** Validate the two Critical+Unknown risks before building full infrastructure.
 
-**Risk focus:**
+**Outcome:** Both risks resolved. POC validates resume semantics, SQLite and MemoryStore implementations complete with 53 tests.
 
-- Can we checkpoint and resume at exact loop position?
-- Does SQLite handle concurrent run_ids correctly?
+**Deliverables:**
+- `scripts/resume_poc.py` - throwaway POC (validated approach)
+- `nanoagent/persistence/protocols.py` - Protocol definitions + RunState/Phase models
+- `nanoagent/persistence/sqlite_store.py` - SQLite implementation (WAL mode)
+- `nanoagent/persistence/memory_store.py` - In-memory implementation
+- 53 persistence tests covering all protocols
 
-**Tasks:**
-
-1. Resume POC - minimal script that simulates orchestrator loop, checkpoints state, "crashes", resumes at correct position
-2. Define store protocols (`RunStore`, `TaskStore`, `ContextStore`)
-3. Implement `SQLiteStore` backing all three
-4. Concurrent access tests
-
-**Success criteria:**
-
-- *Minimum:* POC demonstrates loop state save/restore works; SQLite round-trips data correctly
-- *Complete:* Full protocol implementation with concurrent run isolation proven
-
-**Exploration budget:** 30% - this is de-risking, expect some throwaway code
-
-### Milestone 2: Refactor TodoManager
+### Milestone 2: Refactor TodoManager ← CURRENT
 
 **Goal:** Replace in-memory storage with `TaskStore` dependency.
 
 **Tasks:**
-
-1. Refactor `TodoManager` to use `TaskStore`
-2. Update existing tests
-3. Ensure backward compatibility for tests that don't need persistence
+- `pending/002-todomanager-refactor.md` - Inject TaskStore dependency, keep backward compatibility
 
 **Success criteria:**
 
-- *Minimum:* All existing TodoManager tests pass
+- *Minimum:* All existing TodoManager tests pass unchanged
 - *Complete:* Tasks persist across TodoManager instantiations (same run_id)
 
 ### Milestone 3: Refactor Orchestrator
@@ -107,11 +100,8 @@ class SQLiteStore(RunStore, TaskStore, ContextStore):
 **Goal:** Replace in-memory context/iteration with `RunStore` + `ContextStore`, enable resume.
 
 **Tasks:**
-
-1. Refactor `Orchestrator` to use stores
-2. Integrate loop state checkpointing from M1 POC
-3. Implement `Orchestrator.resume(run_id)`
-4. Update existing tests
+- `pending/003-orchestrator-persistence.md` - Inject stores, checkpoint loop state
+- `pending/004-orchestrator-resume.md` - Implement `Orchestrator.resume(run_id)` method
 
 **Success criteria:**
 
@@ -192,4 +182,9 @@ class SQLiteStore(RunStore, TaskStore, ContextStore):
 
 ### Completed
 
-(none yet)
+- **001-store-protocols-sqlite** (M1): Resume POC + Store Foundation
+  - POC validated resume semantics (checkpoint before execution)
+  - Three protocols: `RunStore`, `TaskStore`, `ContextStore`
+  - Two implementations: `SQLiteStore` (WAL mode), `MemoryStore`
+  - Security: path traversal protection, FK constraints, error handling
+  - 53 persistence tests, full suite 282/282 passing
