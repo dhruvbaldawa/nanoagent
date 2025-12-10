@@ -1,8 +1,11 @@
 # ABOUTME: Automated orchestrator loop that coordinates planning, execution, and reflection
 # ABOUTME: Implements planning → execution → reflection cycle with configurable iteration limits
 
+from __future__ import annotations
+
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from nanoagent.core.executor import execute_task
 from nanoagent.core.reflector import reflect_on_progress
@@ -11,6 +14,11 @@ from nanoagent.core.task_planner import plan_tasks
 from nanoagent.core.todo_manager import TodoManager
 from nanoagent.models.schemas import AgentRunResult, AgentStatus, ReflectionOutput, TaskStatus
 from nanoagent.tools.registry import ToolRegistry
+
+if TYPE_CHECKING:
+    from nanoagent.persistence.protocols import ContextStore, RunStore, TaskStore
+
+from nanoagent.persistence.protocols import Phase
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +39,10 @@ class Orchestrator:
         goal: str,
         max_iterations: int = 10,
         registry: ToolRegistry | None = None,
+        run_store: RunStore | None = None,
+        task_store: TaskStore | None = None,
+        context_store: ContextStore | None = None,
+        run_id: str | None = None,
     ) -> None:
         """
         Initialize Orchestrator with goal and iteration limits.
@@ -39,9 +51,14 @@ class Orchestrator:
             goal: High-level goal to accomplish
             max_iterations: Maximum iterations before terminating (must be > 0)
             registry: Optional ToolRegistry for task execution (creates new if not provided)
+            run_store: Optional RunStore for run lifecycle persistence
+            task_store: Optional TaskStore for task persistence
+            context_store: Optional ContextStore for execution context persistence
+            run_id: Required when stores provided, unique run identifier
 
         Raises:
             ValueError: If goal is empty/whitespace-only or max_iterations <= 0
+            ValueError: If stores provided without all stores or without run_id
         """
         # Input validation
         if not goal or not goal.strip():
@@ -50,19 +67,44 @@ class Orchestrator:
         if max_iterations <= 0:
             raise ValueError("max_iterations must be greater than 0")
 
+        # All-or-nothing store validation
+        stores = [run_store, task_store, context_store]
+        stores_provided = sum(1 for s in stores if s is not None)
+        if stores_provided > 0 and stores_provided < 3:
+            raise ValueError("If any store is provided, all stores must be provided")
+
+        if stores_provided == 3 and run_id is None:
+            raise ValueError("run_id is required when stores are provided")
+
         self.goal = goal
         self.max_iterations = max_iterations
         self.registry = registry or ToolRegistry()
-        self.todo = TodoManager()
         self.stream = StreamManager()
         self.context: dict[str, str] = {}
         self.iteration = 0
+
+        # Store references for persistence
+        self._run_store = run_store
+        self._task_store = task_store
+        self._context_store = context_store
+        self._run_id = run_id
+
+        # Create TodoManager - with persistence if stores provided
+        if task_store is not None and run_id is not None:
+            self.todo = TodoManager(store=task_store, run_id=run_id)
+        else:
+            self.todo = TodoManager()
+
+        # Create run record if stores provided
+        if run_store is not None and run_id is not None:
+            run_store.create(run_id, goal, max_iterations)
 
         logger.info(
             "Orchestrator initialized",
             extra={
                 "goal": goal[:100],
                 "max_iterations": max_iterations,
+                "persistent": run_store is not None,
             },
         )
 
@@ -99,6 +141,10 @@ class Orchestrator:
                 extra={"task_count": len(plan_output.tasks)},
             )
 
+            # Checkpoint: transition to EXECUTING phase
+            if self._run_store is not None and self._run_id is not None:
+                self._run_store.update_loop_state(self._run_id, Phase.EXECUTING, 0, None)
+
             # Phase 1: Execution loop
             while self.iteration < self.max_iterations:
                 self.iteration += 1
@@ -114,6 +160,11 @@ class Orchestrator:
                     "completed_tasks": len(self.todo.get_done()),
                 },
             )
+
+            # Checkpoint: transition to DONE phase
+            if self._run_store is not None and self._run_id is not None:
+                self._run_store.update_loop_state(self._run_id, Phase.DONE, self.iteration, None)
+
             return AgentRunResult(
                 output=self._synthesize_result(),
                 status=AgentStatus.COMPLETED,
@@ -158,12 +209,20 @@ class Orchestrator:
         if current_task is None:
             return await self._reflect_and_check_completion()
 
+        # Checkpoint: before executing task (with task_id)
+        if self._run_store is not None and self._run_id is not None:
+            self._run_store.update_loop_state(self._run_id, Phase.EXECUTING, self.iteration, current_task.id)
+
         # Emit task_started event (fire-and-forget, never raises)
         self.stream.emit("task_started", {"task_id": current_task.id, "description": current_task.description})
 
         # Execute task
         execution_result = await execute_task(current_task.description)
+
+        # Store context - both in-memory and persistent
         self.context[current_task.id] = execution_result.output
+        if self._context_store is not None and self._run_id is not None:
+            self._context_store.save_result(self._run_id, current_task.id, execution_result.output)
 
         # Emit task_completed event (fire-and-forget, never raises)
         self.stream.emit(
@@ -199,6 +258,10 @@ class Orchestrator:
         Returns:
             AgentRunResult if done, None to continue
         """
+        # Checkpoint: transition to REFLECTING phase
+        if self._run_store is not None and self._run_id is not None:
+            self._run_store.update_loop_state(self._run_id, Phase.REFLECTING, self.iteration, None)
+
         logger.debug("Reflecting on progress")
         reflection = await reflect_on_progress(self.goal, self.todo.get_done(), self.todo.get_pending())
 
@@ -231,6 +294,11 @@ class Orchestrator:
                     "completed_tasks": len(self.todo.get_done()),
                 },
             )
+
+            # Checkpoint: transition to DONE phase
+            if self._run_store is not None and self._run_id is not None:
+                self._run_store.update_loop_state(self._run_id, Phase.DONE, self.iteration, None)
+
             return AgentRunResult(
                 output=self._synthesize_result(),
                 status=AgentStatus.COMPLETED,

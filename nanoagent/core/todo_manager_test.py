@@ -1,6 +1,8 @@
 # ABOUTME: Unit tests for TodoManager task queue implementation
 # ABOUTME: Validates priority-based task ordering and completion tracking
 
+import pathlib
+
 import pytest
 from _pytest.logging import LogCaptureFixture
 
@@ -204,3 +206,198 @@ class TestTodoManager:
 
         assert "Cannot mark nonexistent task as done" in caplog.text
         assert "nonexistent" in caplog.text
+
+
+class TestTodoManagerPersistence:
+    """Test TodoManager with TaskStore persistence"""
+
+    def test_store_without_run_id_raises_error(self):
+        """Providing store without run_id raises ValueError"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        with pytest.raises(ValueError, match="run_id.*required"):
+            TodoManager(store=store)
+
+    def test_run_id_without_store_raises_error(self):
+        """Providing run_id without store raises ValueError"""
+        with pytest.raises(ValueError, match="store.*required"):
+            TodoManager(run_id="test-run")
+
+    def test_add_tasks_persists_to_store(self):
+        """add_tasks saves tasks to store when provided"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        task_ids = manager.add_tasks(["Task 1", "Task 2"])
+
+        # Verify tasks are in store
+        stored_tasks = store.get_all_tasks("test-run")
+        assert len(stored_tasks) == 2
+        assert {t.id for t in stored_tasks} == set(task_ids)
+
+    def test_get_next_reads_from_store(self):
+        """get_next returns highest priority pending task from store"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        manager.add_tasks(["Low priority"], priority=1)
+        manager.add_tasks(["High priority"], priority=10)
+
+        next_task = manager.get_next()
+        assert next_task is not None
+        assert next_task.description == "High priority"
+
+    def test_mark_done_updates_store(self):
+        """mark_done updates task status in store"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        task_id = manager.add_tasks(["Task"])[0]
+        manager.mark_done(task_id, "Completed")
+
+        # Verify status updated in store
+        stored_tasks = store.get_all_tasks("test-run")
+        done_task = next(t for t in stored_tasks if t.id == task_id)
+        assert done_task.status == TaskStatus.DONE
+        assert done_task.result == "Completed"
+
+    def test_get_pending_reads_from_store(self):
+        """get_pending returns pending tasks from store"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        manager.add_tasks(["Task 1", "Task 2"])
+        task_id = manager.add_tasks(["Task 3"])[0]
+        manager.mark_done(task_id, "Done")
+
+        pending = manager.get_pending()
+        assert len(pending) == 2
+
+    def test_get_done_reads_from_store(self):
+        """get_done returns completed tasks from store"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        task_ids = manager.add_tasks(["Task 1", "Task 2", "Task 3"])
+        manager.mark_done(task_ids[0], "Done 1")
+        manager.mark_done(task_ids[2], "Done 3")
+
+        done = manager.get_done()
+        assert len(done) == 2
+        assert {t.id for t in done} == {task_ids[0], task_ids[2]}
+
+    def test_tasks_persist_across_instances(self):
+        """Tasks persist across TodoManager instances with same store + run_id"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+
+        # First instance adds tasks
+        manager1 = TodoManager(store=store, run_id="test-run")
+        task_id = manager1.add_tasks(["Persistent task"])[0]
+
+        # Second instance sees the task
+        manager2 = TodoManager(store=store, run_id="test-run")
+        pending = manager2.get_pending()
+        assert len(pending) == 1
+        assert pending[0].id == task_id
+        assert pending[0].description == "Persistent task"
+
+    def test_completion_persists_across_instances(self):
+        """Task completion persists across TodoManager instances"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+
+        # First instance adds and completes task
+        manager1 = TodoManager(store=store, run_id="test-run")
+        task_id = manager1.add_tasks(["Task"])[0]
+        manager1.mark_done(task_id, "Completed")
+
+        # Second instance sees completion
+        manager2 = TodoManager(store=store, run_id="test-run")
+        assert len(manager2.get_pending()) == 0
+        done = manager2.get_done()
+        assert len(done) == 1
+        assert done[0].result == "Completed"
+
+    def test_works_with_sqlite_store(self, tmp_path: pathlib.Path):
+        """TodoManager works with SQLiteStore"""
+        from nanoagent.persistence import SQLiteStore
+
+        db_path = tmp_path / "test.db"
+        store = SQLiteStore(str(db_path))
+        store.create("test-run", "test goal", 10)
+
+        manager = TodoManager(store=store, run_id="test-run")
+        task_ids = manager.add_tasks(["Task 1", "Task 2"])
+        manager.mark_done(task_ids[0], "Done")
+
+        assert len(manager.get_pending()) == 1
+        assert len(manager.get_done()) == 1
+
+        store.close()
+
+    def test_priority_ordering_matches_inmemory_mode(self):
+        """Priority ordering in persistent mode matches in-memory mode"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        # Add tasks in specific order
+        manager.add_tasks(["Priority 3"], priority=3)
+        manager.add_tasks(["Priority 5"], priority=5)
+        manager.add_tasks(["Priority 1"], priority=1)
+
+        # Should return highest priority first
+        task1 = manager.get_next()
+        assert task1 is not None
+        assert task1.description == "Priority 5"
+
+        manager.mark_done(task1.id, "Done")
+        task2 = manager.get_next()
+        assert task2 is not None
+        assert task2.description == "Priority 3"
+
+    def test_mark_done_nonexistent_in_persistent_mode(self):
+        """mark_done raises ValueError for nonexistent task in persistent mode"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        with pytest.raises(ValueError, match="Cannot mark nonexistent"):
+            manager.mark_done("nonexistent-id", "result")
+
+    def test_empty_store_returns_none(self):
+        """get_next returns None when store has no tasks"""
+        from nanoagent.persistence import MemoryStore
+
+        store = MemoryStore()
+        store.create("test-run", "test goal", 10)
+        manager = TodoManager(store=store, run_id="test-run")
+
+        assert manager.get_next() is None
+        assert manager.get_pending() == []
+        assert manager.get_done() == []
