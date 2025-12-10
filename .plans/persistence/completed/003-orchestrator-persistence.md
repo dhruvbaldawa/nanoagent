@@ -115,15 +115,66 @@ def __init__(
 
 ## Validation
 
-- [ ] Existing Orchestrator tests pass unchanged (16 tests)
-- [ ] Constructor validates all-or-nothing store injection
-- [ ] Run record created on init when stores provided
-- [ ] Checkpoint at Phase.EXECUTING after planning
-- [ ] Checkpoint before each task execution (with task_id)
-- [ ] Context saved via ContextStore after each task
-- [ ] Checkpoint at Phase.REFLECTING before reflection
-- [ ] Checkpoint at Phase.DONE on completion
-- [ ] Works with MemoryStore
-- [ ] Works with SQLiteStore
-- [ ] basedpyright passes
-- [ ] ruff passes
+- [x] Existing Orchestrator tests pass unchanged (16 tests)
+- [x] Constructor validates all-or-nothing store injection
+- [x] Run record created on init when stores provided
+- [x] Checkpoint at Phase.EXECUTING after planning
+- [x] Checkpoint before each task execution (with task_id)
+- [x] Context saved via ContextStore after each task
+- [x] Checkpoint at Phase.REFLECTING before reflection
+- [x] Checkpoint at Phase.DONE on completion
+- [x] Works with MemoryStore
+- [x] Works with SQLiteStore
+- [x] basedpyright passes
+- [x] ruff passes
+
+**Status:** APPROVED
+
+**implementation:**
+- Added optional `run_store`, `task_store`, `context_store`, `run_id` parameters to `Orchestrator.__init__()`
+- Constructor validates all-or-nothing store injection (if any store provided, all must be provided)
+- Run record created via `run_store.create()` during init when stores provided
+- TodoManager passed `task_store` and `run_id` when stores provided
+- Checkpoint at EXECUTING after planning via `run_store.update_loop_state()`
+- Checkpoint before each task execution with `current_task_id`
+- Context saved via `context_store.save_result()` after each task execution
+- Checkpoint at REFLECTING before reflection
+- Checkpoint at DONE on completion (both via reflection.done and max iterations)
+- 12 new tests covering all persistence scenarios
+- Full test suite: 307/307 passing (was 295)
+- Existing 16 Orchestrator tests pass unchanged (backward compatibility preserved)
+- Working Result verified: ✓ Orchestrator checkpoints state at each phase transition
+- Files:
+  - `nanoagent/core/orchestrator.py` - Added persistence mode with checkpoint calls
+  - `nanoagent/core/orchestrator_test.py` - Added 12 persistence tests
+
+**testing:**
+Validated 31 tests (all behavior-focused, no mocking of store calls)
+
+Added 2 edge cases:
+- test_checkpoint_at_done_via_max_iterations: Verifies DONE phase on max iterations termination
+- test_context_saved_for_failed_execution: Verifies context saved even for failed task execution
+
+Test breakdown: Unit: 3 (validation) | Integration: 28 (orchestration flows) | Total: 31
+Full suite: 309/309 passing
+Working Result verified: ✓ Orchestrator checkpoints state at each phase transition with full test coverage
+
+**review:**
+Security: 90/100 | Quality: 90/100 | Performance: 95/100 | Tests: 85/100
+
+Working Result verified: ✓ Orchestrator checkpoints state at each phase transition
+Validation: 12/12 items passing
+Full test suite: 309/309 passing
+Diff: 523 lines (70 impl + 453 tests)
+
+**Specialized Review Findings:**
+
+- Test Coverage: No CRITICAL gaps (0 gaps rated 9-10). Store failure modes flagged at 8/10 but follow approved error propagation pattern from Task 001.
+- Error Handling: No CRITICAL issues. Store operations propagate errors to caller (intentional design - follows Task 001/002 pattern). Adding try-catch would only log + re-raise.
+- Security: No vulnerabilities detected (0 findings >70 confidence). Parameterized queries, cryptographic task IDs, input validation present. run_id validation flagged at 62 confidence (defense-in-depth suggestion, not blocking).
+
+HIGH findings (acceptable with justification):
+1. [Test] Store failure modes not explicitly tested - Criticality 8/10. Store implementations already tested in Task 001. Errors propagate to caller by design. This is consistent with "promise theory" pattern approved in prior tasks.
+2. [Error] Store operations without explicit try-catch - HIGH. Intentional: errors propagate to Orchestrator caller who handles failures. Consistent with Task 001/002 design.
+
+APPROVED → completed
